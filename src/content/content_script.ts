@@ -416,8 +416,8 @@ class AgentYapInjector {
         // Generate the reply
         const reply = await generateReply(tweetText, selectedTone)
         
-        // Fill the reply box
-        await this.fillReplyBox(replyBox, reply)
+        // Fill the reply box with enhanced method
+        await this.fillReplyBoxEnhanced(replyBox, reply)
         
         // Success feedback
         button.style.background = '#10b981'
@@ -500,8 +500,8 @@ class AgentYapInjector {
       try {
         const newReply = await rewriteReply(currentReply)
         
-        // Fill the reply box with new reply
-        await this.fillReplyBox(replyBox, newReply)
+        // Fill the reply box with new reply using enhanced method
+        await this.fillReplyBoxEnhanced(replyBox, newReply)
         
         button.innerHTML = '✅ Rewritten!'
         button.dataset.currentReply = newReply
@@ -588,9 +588,12 @@ class AgentYapInjector {
     return null
   }
 
-  private async fillReplyBox(replyBox: HTMLElement, text: string): Promise<void> {
-    // Focus the reply box
+  private async fillReplyBoxEnhanced(replyBox: HTMLElement, text: string): Promise<void> {
+    console.log('Filling reply box with enhanced method:', text)
+    
+    // Step 1: Focus and clear
     replyBox.focus()
+    await new Promise(resolve => setTimeout(resolve, 100))
 
     // Clear existing content
     if (replyBox.tagName === 'TEXTAREA' || replyBox.tagName === 'INPUT') {
@@ -600,7 +603,7 @@ class AgentYapInjector {
       replyBox.innerHTML = ''
     }
 
-    // Set the new content
+    // Step 2: Set content using multiple methods
     if (replyBox.tagName === 'TEXTAREA' || replyBox.tagName === 'INPUT') {
       (replyBox as HTMLInputElement).value = text
     } else {
@@ -608,8 +611,57 @@ class AgentYapInjector {
       replyBox.innerHTML = text
     }
 
-    // Dispatch comprehensive events to notify Twitter
+    // Step 3: Simulate realistic typing to trigger all React events
+    await this.simulateTypingSequence(replyBox, text)
+
+    // Step 4: Trigger comprehensive event sequence
+    await this.triggerComprehensiveEvents(replyBox, text)
+
+    // Step 5: Force Twitter to recognize the content
+    await this.forceTwitterRecognition(replyBox, text)
+
+    console.log('Reply box filled successfully')
+  }
+
+  private async simulateTypingSequence(replyBox: HTMLElement, text: string): Promise<void> {
+    // Clear first
+    if (replyBox.tagName === 'TEXTAREA' || replyBox.tagName === 'INPUT') {
+      (replyBox as HTMLInputElement).value = ''
+    } else {
+      replyBox.textContent = ''
+      replyBox.innerHTML = ''
+    }
+
+    // Type character by character
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i]
+      
+      // Update content
+      if (replyBox.tagName === 'TEXTAREA' || replyBox.tagName === 'INPUT') {
+        (replyBox as HTMLInputElement).value += char
+      } else {
+        replyBox.textContent += char
+        replyBox.innerHTML = replyBox.textContent || ''
+      }
+
+      // Dispatch input event for each character
+      const inputEvent = new InputEvent('input', {
+        bubbles: true,
+        inputType: 'insertText',
+        data: char
+      })
+      replyBox.dispatchEvent(inputEvent)
+
+      // Add small delay every few characters
+      if (i % 5 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 20))
+      }
+    }
+  }
+
+  private async triggerComprehensiveEvents(replyBox: HTMLElement, text: string): Promise<void> {
     const events = [
+      // Basic events
       new Event('focus', { bubbles: true }),
       new Event('input', { bubbles: true }),
       new InputEvent('input', { 
@@ -618,24 +670,91 @@ class AgentYapInjector {
         data: text
       }),
       new Event('change', { bubbles: true }),
+      
+      // Keyboard events
       new KeyboardEvent('keydown', { bubbles: true, key: 'a' }),
       new KeyboardEvent('keyup', { bubbles: true, key: 'a' }),
+      new KeyboardEvent('keypress', { bubbles: true, key: 'a' }),
+      
+      // Composition events
       new Event('compositionstart', { bubbles: true }),
       new Event('compositionend', { bubbles: true }),
-      new Event('paste', { bubbles: true })
+      
+      // Other events
+      new Event('paste', { bubbles: true }),
+      new Event('textInput', { bubbles: true }),
+      
+      // Space key to trigger character count
+      new KeyboardEvent('keydown', { bubbles: true, key: ' ', code: 'Space' }),
+      new KeyboardEvent('keyup', { bubbles: true, key: ' ', code: 'Space' })
     ]
 
     for (const event of events) {
       try {
         replyBox.dispatchEvent(event)
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise(resolve => setTimeout(resolve, 50))
       } catch (e) {
         console.warn('Could not dispatch event:', e)
       }
     }
+  }
 
-    // Keep focus on the reply box
+  private async forceTwitterRecognition(replyBox: HTMLElement, text: string): Promise<void> {
+    // Method 1: Trigger React's internal state update
+    const reactKey = Object.keys(replyBox).find(key => key.startsWith('__reactInternalInstance') || key.startsWith('__reactFiber'))
+    if (reactKey) {
+      try {
+        const reactInstance = (replyBox as any)[reactKey]
+        if (reactInstance && reactInstance.memoizedProps && reactInstance.memoizedProps.onChange) {
+          reactInstance.memoizedProps.onChange({
+            target: { value: text }
+          })
+        }
+      } catch (e) {
+        console.warn('Could not trigger React state update:', e)
+      }
+    }
+
+    // Method 2: Simulate user interaction pattern
     replyBox.focus()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Simulate a space key press to trigger character counting
+    const spaceDown = new KeyboardEvent('keydown', {
+      bubbles: true,
+      key: ' ',
+      code: 'Space',
+      keyCode: 32,
+      which: 32
+    })
+    const spaceUp = new KeyboardEvent('keyup', {
+      bubbles: true,
+      key: ' ',
+      code: 'Space',
+      keyCode: 32,
+      which: 32
+    })
+    
+    replyBox.dispatchEvent(spaceDown)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    replyBox.dispatchEvent(spaceUp)
+
+    // Method 3: Final input event with full text
+    const finalInputEvent = new InputEvent('input', {
+      bubbles: true,
+      inputType: 'insertText',
+      data: text
+    })
+    replyBox.dispatchEvent(finalInputEvent)
+
+    // Method 4: Blur and refocus to trigger validation
+    replyBox.blur()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    replyBox.focus()
+
+    // Method 5: Trigger change event
+    const changeEvent = new Event('change', { bubbles: true })
+    replyBox.dispatchEvent(changeEvent)
   }
 
   public destroy() {
