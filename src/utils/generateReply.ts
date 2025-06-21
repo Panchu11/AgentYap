@@ -1,5 +1,5 @@
 import { getProjectMeta } from './getProjectMeta'
-import { openRouterAPI } from '../api/openrouter'
+import { fireworksAPI } from '../api/fireworks'
 import { getFallbackReply } from '../mock/fallbackReplies'
 
 export async function generateReply(tweetText: string, tone: string): Promise<string> {
@@ -15,7 +15,7 @@ export async function generateReply(tweetText: string, tone: string): Promise<st
     
     // Try API call first
     try {
-      const response = await openRouterAPI(prompt)
+      const response = await fireworksAPI(prompt)
       return response
     } catch (apiError) {
       console.warn('API call failed, using fallback:', apiError)

@@ -88,7 +88,7 @@ function App() {
       {/* Header */}
       <div className="bg-twitter-blue text-white p-4 flex items-center justify-between">
         <div className="text-center flex-1">
-          <h1 className="text-xl font-bold">💬 AgentYap</h1>
+          <h1 className="text-xl font-bold">💬 YapMate</h1>
           <p className="text-sm opacity-90">AI-powered Twitter replies</p>
         </div>
         <button 
@@ -117,14 +117,14 @@ function App() {
           <div className="text-center py-8 text-gray-500">
             <div className="text-4xl mb-2">🐦</div>
             <p>Click "💬 Reply with AI" on any tweet to get started!</p>
-            <p className="text-xs mt-2">Make sure to configure your API key in settings first.</p>
+            <p className="text-xs mt-2">Make sure to configure your Fireworks API key in settings first.</p>
           </div>
         )}
       </div>
 
       {/* Footer */}
       <div className="p-4 border-t bg-white text-center text-xs text-gray-500">
-        Powered by OpenRouter & Gemini 2.0
+        Powered by Fireworks AI & Dobby Unhinged Llama
       </div>
     </div>
   )

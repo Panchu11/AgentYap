@@ -1,4 +1,4 @@
-import { openRouterAPI } from '../api/openrouter'
+import { fireworksAPI } from '../api/fireworks'
 
 export async function rewriteReply(originalReply: string): Promise<string> {
   try {
@@ -13,7 +13,7 @@ Instructions:
 
 Rewritten reply:`
 
-    const response = await openRouterAPI(prompt)
+    const response = await fireworksAPI(prompt)
     return response
   } catch (error) {
     console.error('Error rewriting reply:', error)

@@ -8,15 +8,15 @@ function Settings() {
 
   useEffect(() => {
     // Load saved API key
-    chrome.storage.sync.get(['openrouterApiKey']).then((result) => {
-      if (result.openrouterApiKey) {
-        setApiKey(result.openrouterApiKey)
+    chrome.storage.sync.get(['fireworksApiKey']).then((result) => {
+      if (result.fireworksApiKey) {
+        setApiKey(result.fireworksApiKey)
       }
     })
   }, [])
 
   const handleSave = async () => {
-    await chrome.storage.sync.set({ openrouterApiKey: apiKey })
+    await chrome.storage.sync.set({ fireworksApiKey: apiKey })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -31,16 +31,15 @@ function Settings() {
     setTestResult(null)
 
     try {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://github.com/Panchu11/AgentYap',
-          'X-Title': 'AgentYap Chrome Extension'
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.0-flash-exp:free',
+          model: 'accounts/sentientfoundation/models/dobby-unhinged-llama-3-3-70b-new',
           messages: [
             {
               role: 'user',
@@ -71,17 +70,17 @@ function Settings() {
       
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          OpenRouter API Key
+          Fireworks AI API Key
         </label>
         <input
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          placeholder="sk-or-v1-..."
+          placeholder="fw_..."
           className="w-full p-2 border rounded-lg text-sm"
         />
         <p className="text-xs text-gray-500 mt-1">
-          Get your free API key from <a href="https://openrouter.ai" target="_blank" className="text-blue-500">openrouter.ai</a>
+          Using Fireworks AI with Dobby Unhinged Llama model
         </p>
       </div>
 
@@ -112,9 +111,9 @@ function Settings() {
 
       <div className="text-xs text-gray-500 space-y-1">
         <p><strong>Troubleshooting:</strong></p>
-        <p>• Make sure your API key starts with "sk-or-v1-"</p>
+        <p>• Make sure your API key starts with "fw_"</p>
         <p>• If you get "Extension context invalidated", refresh the page</p>
-        <p>• Check that you have credits in your OpenRouter account</p>
+        <p>• Check that you have credits in your Fireworks account</p>
       </div>
     </div>
   )

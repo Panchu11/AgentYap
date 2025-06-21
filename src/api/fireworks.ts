@@ -1,5 +1,5 @@
-// Enhanced error handling and context validation
-export async function openRouterAPI(prompt: string): Promise<string> {
+// Enhanced error handling and context validation for Fireworks AI
+export async function fireworksAPI(prompt: string): Promise<string> {
   try {
     // Check if chrome extension context is still valid
     if (!chrome?.storage?.sync) {
@@ -8,33 +8,32 @@ export async function openRouterAPI(prompt: string): Promise<string> {
 
     // Get API key from Chrome storage with timeout
     const result = await Promise.race([
-      chrome.storage.sync.get(['openrouterApiKey']),
+      chrome.storage.sync.get(['fireworksApiKey']),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Storage access timeout')), 5000)
       )
-    ]) as { openrouterApiKey?: string }
+    ]) as { fireworksApiKey?: string }
     
-    const apiKey = result.openrouterApiKey
+    const apiKey = result.fireworksApiKey
     
     if (!apiKey || apiKey.trim() === '') {
       throw new Error('API key not configured. Please set it in extension settings.')
     }
 
-    // Validate API key format
-    if (!apiKey.startsWith('sk-or-v1-')) {
-      throw new Error('Invalid API key format. Please check your OpenRouter API key.')
+    // Validate API key format for Fireworks
+    if (!apiKey.startsWith('fw_')) {
+      throw new Error('Invalid API key format. Please check your Fireworks API key.')
     }
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://github.com/Panchu11/AgentYap',
-        'X-Title': 'AgentYap Chrome Extension'
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free',
+        model: 'accounts/sentientfoundation/models/dobby-unhinged-llama-3-3-70b-new',
         messages: [
           {
             role: 'system',
@@ -53,11 +52,11 @@ export async function openRouterAPI(prompt: string): Promise<string> {
 
     if (!response.ok) {
       if (response.status === 401) {
-        throw new Error('Invalid API key. Please check your OpenRouter API key in settings.')
+        throw new Error('Invalid API key. Please check your Fireworks API key in settings.')
       } else if (response.status === 429) {
         throw new Error('Rate limit exceeded. Please try again in a moment.')
       } else if (response.status >= 500) {
-        throw new Error('OpenRouter service temporarily unavailable. Please try again.')
+        throw new Error('Fireworks service temporarily unavailable. Please try again.')
       } else {
         throw new Error(`API request failed: ${response.status} ${response.statusText}`)
       }
@@ -73,7 +72,7 @@ export async function openRouterAPI(prompt: string): Promise<string> {
     return reply.replace(/^(Reply:|Response:)\s*/i, '').trim()
     
   } catch (error) {
-    console.error('OpenRouter API error:', error)
+    console.error('Fireworks API error:', error)
     
     // Re-throw with more specific error messages
     if (error instanceof Error) {
