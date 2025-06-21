@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "matches": ["https://x.com/*", "https://twitter.com/*"],
-      "js": ["src/content/content_script.js"],
+      "js": ["src/content/content.js"],
       "run_at": "document_end"
     }
   ],
