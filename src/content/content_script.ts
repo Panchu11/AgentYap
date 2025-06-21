@@ -329,7 +329,7 @@ class AgentYapInjector {
       const element = document.querySelector(selector) as HTMLElement
       if (element) {
         try {
-          // Focus the element
+          // Focus the element first
           element.focus()
           
           // Clear existing content
@@ -356,7 +356,11 @@ class AgentYapInjector {
             new KeyboardEvent('keydown', { bubbles: true, key: 'a' }),
             new KeyboardEvent('keyup', { bubbles: true, key: 'a' }),
             new Event('blur', { bubbles: true }),
-            new Event('paste', { bubbles: true })
+            new Event('paste', { bubbles: true }),
+            // Additional events for Twitter's React components
+            new InputEvent('input', { bubbles: true, inputType: 'insertText', data: reply }),
+            new Event('compositionend', { bubbles: true }),
+            new KeyboardEvent('keypress', { bubbles: true, key: 'Enter' }),
           ]
 
           events.forEach(event => {
@@ -366,6 +370,9 @@ class AgentYapInjector {
               console.warn('Could not dispatch event:', e)
             }
           })
+
+          // Additional step: simulate typing to trigger React state updates
+          await this.simulateTyping(element, reply)
 
           console.log(`Successfully filled reply box using selector: ${selector}`)
           filled = true
@@ -379,6 +386,62 @@ class AgentYapInjector {
     if (!filled) {
       throw new Error('Could not fill any reply textarea')
     }
+  }
+
+  private async simulateTyping(element: HTMLElement, text: string): Promise<void> {
+    // Clear the element first
+    if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+      (element as HTMLInputElement).value = ''
+    } else {
+      element.textContent = ''
+      element.innerHTML = ''
+    }
+
+    // Focus the element
+    element.focus()
+
+    // Simulate typing character by character
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i]
+      
+      // Update the content
+      if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+        (element as HTMLInputElement).value += char
+      } else {
+        element.textContent += char
+        element.innerHTML = element.textContent
+      }
+
+      // Dispatch input event for each character
+      const inputEvent = new InputEvent('input', {
+        bubbles: true,
+        inputType: 'insertText',
+        data: char
+      })
+      element.dispatchEvent(inputEvent)
+
+      // Small delay to make it more realistic
+      if (i % 10 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+    }
+
+    // Final events to ensure Twitter recognizes the content
+    const finalEvents = [
+      new Event('input', { bubbles: true }),
+      new Event('change', { bubbles: true }),
+      new KeyboardEvent('keyup', { bubbles: true, key: 'a' }),
+      new Event('blur', { bubbles: true }),
+      new Event('focus', { bubbles: true })
+    ]
+
+    finalEvents.forEach(event => {
+      try {
+        element.dispatchEvent(event)
+      } catch (e) {
+        console.warn('Could not dispatch final event:', e)
+      }
+    })
   }
 
   private addRewriteButton(originalButton: HTMLElement, currentReply: string) {
