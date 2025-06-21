@@ -97,11 +97,16 @@ class AgentYapInjector {
     this.observer = new MutationObserver((mutations) => {
       if (!this.isContextValid) return
 
+      let shouldCheck = false
       mutations.forEach((mutation) => {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          setTimeout(() => this.checkForReplyBoxes(), 300)
+          shouldCheck = true
         }
       })
+
+      if (shouldCheck) {
+        setTimeout(() => this.checkForReplyBoxes(), 200)
+      }
     })
 
     this.observer.observe(document.body, {
@@ -109,27 +114,50 @@ class AgentYapInjector {
       subtree: true
     })
 
+    // Initial check
     this.checkForReplyBoxes()
+    
+    // Periodic check to catch any missed reply boxes
+    setInterval(() => {
+      if (this.isContextValid) {
+        this.checkForReplyBoxes()
+      }
+    }, 2000)
   }
 
   private checkForReplyBoxes() {
+    console.log('Checking for reply boxes...')
+    
     // Remove any orphaned buttons first
     this.cleanupOrphanedButtons()
 
+    // More comprehensive selectors for reply boxes
     const replySelectors = [
       '[data-testid="tweetTextarea_0"]',
-      '[data-testid="tweetTextarea_1"]', 
+      '[data-testid="tweetTextarea_1"]',
+      '[data-testid="tweetTextarea_2"]',
       '[role="textbox"][data-testid*="tweet"]',
+      '[role="textbox"][aria-label*="reply"]',
+      '[role="textbox"][aria-label*="Reply"]',
       '.public-DraftEditor-content',
-      '[contenteditable="true"][data-testid*="tweet"]'
+      '[contenteditable="true"][data-testid*="tweet"]',
+      '[contenteditable="true"][aria-label*="reply"]',
+      '[contenteditable="true"][aria-label*="Reply"]'
     ]
 
+    let foundBoxes = 0
     for (const selector of replySelectors) {
       const replyBoxes = document.querySelectorAll(selector)
+      console.log(`Found ${replyBoxes.length} elements for selector: ${selector}`)
+      
       replyBoxes.forEach((replyBox) => {
-        this.maybeInjectFloatingButton(replyBox as HTMLElement)
+        if (this.maybeInjectFloatingButton(replyBox as HTMLElement)) {
+          foundBoxes++
+        }
       })
     }
+    
+    console.log(`Total reply boxes processed: ${foundBoxes}`)
   }
 
   private cleanupOrphanedButtons() {
@@ -143,25 +171,28 @@ class AgentYapInjector {
     })
   }
 
-  private maybeInjectFloatingButton(replyBox: HTMLElement) {
+  private maybeInjectFloatingButton(replyBox: HTMLElement): boolean {
     // Create unique ID for this reply box
     const boxId = this.createUniqueId(replyBox)
     
     // Skip if already injected
     if (this.injectedButtons.has(boxId)) {
-      return
+      return false
     }
 
-    // Skip if not a real reply box
-    if (!this.isReplyBox(replyBox)) {
-      return
+    // Skip if element is not visible
+    if (!this.isElementVisible(replyBox)) {
+      return false
     }
 
-    // Find tweet text
+    // Find tweet text - be more permissive
     const tweetText = this.findTweetTextForReply(replyBox)
     if (!tweetText) {
-      return
+      console.log('No tweet text found for reply box')
+      return false
     }
+
+    console.log('Injecting AI button for tweet:', tweetText.substring(0, 50) + '...')
 
     // Mark the reply box with our ID
     replyBox.setAttribute('data-yapmate-id', boxId)
@@ -169,6 +200,13 @@ class AgentYapInjector {
     // Create floating button
     this.createFloatingButton(replyBox, tweetText, boxId)
     this.injectedButtons.add(boxId)
+    
+    return true
+  }
+
+  private isElementVisible(element: HTMLElement): boolean {
+    const rect = element.getBoundingClientRect()
+    return rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.left >= 0
   }
 
   private createUniqueId(replyBox: HTMLElement): string {
@@ -176,42 +214,6 @@ class AgentYapInjector {
     const timestamp = Date.now()
     const random = Math.random().toString(36).substr(2, 5)
     return `yapmate-${Math.round(rect.top)}-${Math.round(rect.left)}-${timestamp}-${random}`
-  }
-
-  private isReplyBox(replyBox: HTMLElement): boolean {
-    // Simple checks to determine if this is a reply box
-    
-    // Check for reply indicators in the DOM
-    const replyIndicators = [
-      '[data-testid*="reply"]',
-      '[aria-label*="reply"]',
-      '[aria-label*="Reply"]'
-    ]
-
-    let container = replyBox.parentElement
-    let depth = 0
-    while (container && depth < 10) {
-      for (const indicator of replyIndicators) {
-        if (container.querySelector(indicator) || container.matches(indicator)) {
-          return true
-        }
-      }
-      container = container.parentElement
-      depth++
-    }
-
-    // Check if we're in a modal (reply modal)
-    if (replyBox.closest('[role="dialog"]')) {
-      return true
-    }
-
-    // Check if we can find tweet text nearby
-    const tweetText = this.findTweetTextForReply(replyBox)
-    if (tweetText && tweetText.length > 10) {
-      return true
-    }
-
-    return false
   }
 
   private createFloatingButton(replyBox: HTMLElement, tweetText: string, boxId: string) {
@@ -266,6 +268,7 @@ class AgentYapInjector {
         return
       }
 
+      console.log('AI button clicked, showing tone popup')
       // Show mini popup for tone selection
       this.showTonePopup(button, replyBox, tweetText)
     })
@@ -288,13 +291,13 @@ class AgentYapInjector {
     window.addEventListener('scroll', updatePosition, { passive: true })
     window.addEventListener('resize', updatePosition, { passive: true })
 
-    // Store cleanup function
-    button.setAttribute('data-cleanup', 'true')
-
     document.body.appendChild(button)
+    console.log('AI button created and added to DOM')
   }
 
   private showTonePopup(button: HTMLElement, replyBox: HTMLElement, tweetText: string) {
+    console.log('Showing tone popup')
+    
     // Remove any existing popup
     const existingPopup = document.querySelector('.yapmate-tone-popup')
     if (existingPopup) {
@@ -352,6 +355,7 @@ class AgentYapInjector {
       })
 
       toneButton.addEventListener('click', async () => {
+        console.log(`Tone selected: ${tone.value}`)
         popup.remove()
         await this.generateAndFillReply(button, replyBox, tweetText, tone.value)
       })
@@ -375,12 +379,15 @@ class AgentYapInjector {
   }
 
   private async generateAndFillReply(button: HTMLElement, replyBox: HTMLElement, tweetText: string, tone: string) {
+    console.log(`Generating ${tone} reply for tweet: ${tweetText.substring(0, 50)}...`)
+    
     // Show loading state
     button.innerHTML = '⏳'
     button.style.background = '#0d8bd9'
 
     try {
       const reply = await generateReply(tweetText, tone)
+      console.log('Generated reply:', reply)
       
       // Fill the reply box
       await this.fillReplyBox(replyBox, reply)
@@ -486,6 +493,8 @@ class AgentYapInjector {
   }
 
   private async fillReplyBox(replyBox: HTMLElement, text: string): Promise<void> {
+    console.log('Filling reply box with text:', text)
+    
     // Focus the reply box
     replyBox.focus()
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -506,54 +515,76 @@ class AgentYapInjector {
       replyBox.innerHTML = text
     }
 
-    // Trigger input events
-    const inputEvent = new InputEvent('input', {
-      bubbles: true,
-      inputType: 'insertText',
-      data: text
-    })
-    replyBox.dispatchEvent(inputEvent)
+    // Trigger comprehensive events to ensure Twitter recognizes the content
+    const events = [
+      new Event('focus', { bubbles: true }),
+      new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }),
+      new Event('change', { bubbles: true }),
+      new KeyboardEvent('keydown', { bubbles: true, key: 'a' }),
+      new KeyboardEvent('keyup', { bubbles: true, key: 'a' }),
+      new Event('blur', { bubbles: true }),
+      new Event('focus', { bubbles: true })
+    ]
 
-    const changeEvent = new Event('change', { bubbles: true })
-    replyBox.dispatchEvent(changeEvent)
+    for (const event of events) {
+      try {
+        replyBox.dispatchEvent(event)
+        await new Promise(resolve => setTimeout(resolve, 50))
+      } catch (e) {
+        console.warn('Could not dispatch event:', e)
+      }
+    }
 
-    // Focus again to ensure Twitter recognizes the content
-    replyBox.focus()
+    console.log('Reply box filled successfully')
   }
 
   private findTweetTextForReply(replyBox: HTMLElement): string | null {
-    // Method 1: Look in the same article
+    console.log('Looking for tweet text for reply box')
+    
+    // Method 1: Look in the same article (for inline replies)
     let container = replyBox.closest('article')
     if (container) {
       const tweetTextElement = container.querySelector('[data-testid="tweetText"]')
       if (tweetTextElement?.textContent) {
+        console.log('Found tweet text in same article:', tweetTextElement.textContent.substring(0, 50))
         return tweetTextElement.textContent.trim()
       }
     }
 
-    // Method 2: Look in modal dialogs
+    // Method 2: Look in modal dialogs (for reply modals)
     const modalContainer = replyBox.closest('[role="dialog"]')
     if (modalContainer) {
       const tweetTextElement = modalContainer.querySelector('[data-testid="tweetText"]')
       if (tweetTextElement?.textContent) {
+        console.log('Found tweet text in modal:', tweetTextElement.textContent.substring(0, 50))
         return tweetTextElement.textContent.trim()
       }
     }
 
-    // Method 3: Find closest tweet text on the page
+    // Method 3: Look for any tweet text on the page (more permissive)
     const allTweetTexts = document.querySelectorAll('[data-testid="tweetText"]')
+    console.log(`Found ${allTweetTexts.length} tweet texts on page`)
+    
     if (allTweetTexts.length > 0) {
+      // For opened tweet pages, often the first tweet text is the main tweet
+      const firstTweet = allTweetTexts[0] as HTMLElement
+      if (firstTweet?.textContent && firstTweet.textContent.trim().length > 10) {
+        console.log('Using first tweet text:', firstTweet.textContent.substring(0, 50))
+        return firstTweet.textContent.trim()
+      }
+
+      // Fallback: find the closest tweet text
       let closestTweet: HTMLElement | null = null
       let closestDistance = Infinity
       
       const replyRect = replyBox.getBoundingClientRect()
       
       Array.from(allTweetTexts).forEach(tweetElement => {
-        if (tweetElement instanceof HTMLElement) {
+        if (tweetElement instanceof HTMLElement && tweetElement.textContent) {
           const tweetRect = tweetElement.getBoundingClientRect()
           const distance = Math.abs(tweetRect.bottom - replyRect.top)
           
-          if (distance < closestDistance && tweetRect.top < replyRect.top) {
+          if (distance < closestDistance && tweetElement.textContent.trim().length > 10) {
             closestDistance = distance
             closestTweet = tweetElement
           }
@@ -561,10 +592,21 @@ class AgentYapInjector {
       })
       
       if (closestTweet?.textContent) {
+        console.log('Found closest tweet text:', closestTweet.textContent.substring(0, 50))
         return closestTweet.textContent.trim()
       }
     }
 
+    // Method 4: Look for any text content with lang attribute (fallback)
+    const langElements = document.querySelectorAll('[lang]')
+    for (const element of langElements) {
+      if (element.textContent && element.textContent.trim().length > 20) {
+        console.log('Using lang element text:', element.textContent.substring(0, 50))
+        return element.textContent.trim()
+      }
+    }
+
+    console.log('No tweet text found')
     return null
   }
 
