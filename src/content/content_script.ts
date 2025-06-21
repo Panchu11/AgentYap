@@ -3,9 +3,8 @@ import { rewriteReply } from '../utils/rewriteReply'
 
 class AgentYapInjector {
   private observer: MutationObserver | null = null
-  private replyBoxObserver: MutationObserver | null = null
   private isContextValid = true
-  private currentTweetText: string | null = null
+  private injectedContainers = new Set<string>()
 
   constructor() {
     this.init()
@@ -33,7 +32,6 @@ class AgentYapInjector {
 
     // Listen for extension context invalidation
     chrome.runtime.onConnect.addListener(() => {
-      // Connection established, context is valid
       this.isContextValid = true
     })
   }
@@ -53,7 +51,6 @@ class AgentYapInjector {
         case 'GENERATE_REPLY':
           try {
             const reply = await generateReply(message.tweetText, message.tone)
-            // Send reply back to popup with context check
             try {
               if (chrome?.runtime?.id) {
                 chrome.runtime.sendMessage({
@@ -102,14 +99,14 @@ class AgentYapInjector {
   private startObserving() {
     if (!this.isContextValid) return
 
-    // Set up mutation observer for infinite scroll and reply boxes
+    // Set up mutation observer to watch for reply boxes
     this.observer = new MutationObserver((mutations) => {
       if (!this.isContextValid) return
 
       mutations.forEach((mutation) => {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
           // Check for new reply boxes
-          this.checkForReplyBoxes()
+          setTimeout(() => this.checkForReplyBoxes(), 100)
         }
       })
     })
@@ -119,14 +116,15 @@ class AgentYapInjector {
       subtree: true
     })
 
-    // Initial check for existing reply boxes
+    // Initial check
     this.checkForReplyBoxes()
   }
 
   private checkForReplyBoxes() {
-    // Look for reply textareas that don't have our AI button yet
+    // Look for reply textareas/compose boxes
     const replySelectors = [
       '[data-testid="tweetTextarea_0"]',
+      '[data-testid="tweetTextarea_1"]',
       '[role="textbox"][data-testid*="tweet"]',
       '.public-DraftEditor-content',
       '[contenteditable="true"][data-testid*="tweet"]'
@@ -135,28 +133,110 @@ class AgentYapInjector {
     for (const selector of replySelectors) {
       const replyBoxes = document.querySelectorAll(selector)
       replyBoxes.forEach((replyBox) => {
-        if (!replyBox.closest('.agentyap-container')) {
-          this.injectAIControls(replyBox as HTMLElement)
-        }
+        this.maybeInjectAIControls(replyBox as HTMLElement)
       })
     }
   }
 
-  private injectAIControls(replyBox: HTMLElement) {
+  private maybeInjectAIControls(replyBox: HTMLElement) {
+    // Create unique identifier for this reply box
+    const boxId = this.getReplyBoxId(replyBox)
+    
+    // Skip if already injected
+    if (this.injectedContainers.has(boxId)) {
+      return
+    }
+
+    // Skip if this is not actually a reply box (could be main compose)
+    if (!this.isReplyBox(replyBox)) {
+      return
+    }
+
     // Find the tweet we're replying to
     const tweetText = this.findTweetTextForReply(replyBox)
-    if (!tweetText) return
+    if (!tweetText) {
+      console.log('Could not find tweet text for reply box')
+      return
+    }
 
+    console.log('Injecting AI controls for reply box:', boxId)
+    console.log('Tweet text:', tweetText)
+
+    // Inject AI controls
+    this.injectAIControls(replyBox, tweetText, boxId)
+    this.injectedContainers.add(boxId)
+  }
+
+  private getReplyBoxId(replyBox: HTMLElement): string {
+    // Create a unique ID based on the element's position and attributes
+    const rect = replyBox.getBoundingClientRect()
+    const testId = replyBox.getAttribute('data-testid') || ''
+    return `reply-${testId}-${Math.round(rect.top)}-${Math.round(rect.left)}`
+  }
+
+  private isReplyBox(replyBox: HTMLElement): boolean {
+    // Check if this is actually a reply box and not the main compose box
+    
+    // Method 1: Look for reply-specific indicators
+    const replyIndicators = [
+      '[data-testid*="reply"]',
+      '.css-1dbjc4n[data-testid*="reply"]',
+      '[aria-label*="reply"]',
+      '[aria-label*="Reply"]'
+    ]
+
+    let container = replyBox.parentElement
+    let depth = 0
+    while (container && depth < 10) {
+      for (const indicator of replyIndicators) {
+        if (container.querySelector(indicator) || container.matches(indicator)) {
+          return true
+        }
+      }
+      container = container.parentElement
+      depth++
+    }
+
+    // Method 2: Check if we can find a tweet being replied to nearby
+    const nearbyTweet = this.findTweetTextForReply(replyBox)
+    if (nearbyTweet) {
+      return true
+    }
+
+    // Method 3: Check URL for reply context
+    if (window.location.href.includes('/status/') && window.location.href.includes('reply')) {
+      return true
+    }
+
+    return false
+  }
+
+  private injectAIControls(replyBox: HTMLElement, tweetText: string, boxId: string) {
     // Create container for our AI controls
     const container = document.createElement('div')
     container.className = 'agentyap-container'
+    container.dataset.boxId = boxId
     container.style.cssText = `
-      margin-top: 8px;
-      padding: 8px;
-      background: #f7f9fa;
-      border-radius: 8px;
-      border: 1px solid #e1e8ed;
+      margin-top: 12px;
+      padding: 12px;
+      background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    `
+
+    // Create header
+    const header = document.createElement('div')
+    header.innerHTML = '🤖 <strong>YapMate AI</strong>'
+    header.style.cssText = `
+      font-size: 13px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
     `
 
     // Create tone selector
@@ -170,36 +250,57 @@ class AgentYapInjector {
     rewriteButton.style.display = 'none'
 
     // Add elements to container
+    container.appendChild(header)
     container.appendChild(toneSelector)
     container.appendChild(generateButton)
     container.appendChild(rewriteButton)
 
-    // Insert container after the reply box
-    const replyContainer = replyBox.closest('[data-testid*="tweet"]') || replyBox.parentElement
-    if (replyContainer) {
-      replyContainer.appendChild(container)
+    // Find the best place to insert the container
+    const insertionPoint = this.findInsertionPoint(replyBox)
+    if (insertionPoint) {
+      insertionPoint.appendChild(container)
     }
+  }
+
+  private findInsertionPoint(replyBox: HTMLElement): HTMLElement | null {
+    // Try to find the reply container or compose area
+    let container = replyBox.parentElement
+    let depth = 0
+    
+    while (container && depth < 8) {
+      // Look for common Twitter reply container patterns
+      if (container.querySelector('[data-testid*="reply"]') ||
+          container.querySelector('[role="button"][data-testid*="tweet"]') ||
+          container.matches('[data-testid*="reply"]')) {
+        return container
+      }
+      container = container.parentElement
+      depth++
+    }
+
+    // Fallback: use the direct parent
+    return replyBox.parentElement
   }
 
   private createToneSelector(): HTMLElement {
     const container = document.createElement('div')
     container.style.cssText = `
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     `
 
     const label = document.createElement('div')
-    label.textContent = '🎯 Reply Tone:'
+    label.textContent = '🎯 Tone:'
     label.style.cssText = `
       font-size: 12px;
       font-weight: 600;
-      color: #14171a;
-      margin-bottom: 4px;
+      color: #374151;
+      margin-bottom: 6px;
     `
 
     const toneButtons = document.createElement('div')
     toneButtons.style.cssText = `
       display: flex;
-      gap: 4px;
+      gap: 6px;
       flex-wrap: wrap;
     `
 
@@ -216,11 +317,11 @@ class AgentYapInjector {
       button.dataset.tone = tone.value
       button.innerHTML = `${tone.emoji} ${tone.label}`
       button.style.cssText = `
-        padding: 4px 8px;
-        border: 1px solid #ccd6dd;
-        border-radius: 12px;
+        padding: 6px 10px;
+        border: 1px solid ${index === 0 ? '#1da1f2' : '#d1d5db'};
+        border-radius: 16px;
         background: ${index === 0 ? '#1da1f2' : 'white'};
-        color: ${index === 0 ? 'white' : '#14171a'};
+        color: ${index === 0 ? 'white' : '#374151'};
         font-size: 11px;
         font-weight: 500;
         cursor: pointer;
@@ -232,22 +333,26 @@ class AgentYapInjector {
         toneButtons.querySelectorAll('.agentyap-tone-btn').forEach(btn => {
           btn.classList.remove('selected')
           ;(btn as HTMLElement).style.background = 'white'
-          ;(btn as HTMLElement).style.color = '#14171a'
+          ;(btn as HTMLElement).style.color = '#374151'
+          ;(btn as HTMLElement).style.borderColor = '#d1d5db'
         })
         button.classList.add('selected')
         button.style.background = '#1da1f2'
         button.style.color = 'white'
+        button.style.borderColor = '#1da1f2'
       })
 
       button.addEventListener('mouseenter', () => {
         if (!button.classList.contains('selected')) {
-          button.style.background = '#f0f8ff'
+          button.style.background = '#f3f4f6'
+          button.style.borderColor = '#9ca3af'
         }
       })
 
       button.addEventListener('mouseleave', () => {
         if (!button.classList.contains('selected')) {
           button.style.background = 'white'
+          button.style.borderColor = '#d1d5db'
         }
       })
 
@@ -265,11 +370,11 @@ class AgentYapInjector {
     button.innerHTML = '✨ Generate AI Reply'
     button.style.cssText = `
       width: 100%;
-      padding: 8px 12px;
+      padding: 10px 16px;
       background: linear-gradient(135deg, #1da1f2, #0d8bd9);
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
@@ -279,7 +384,7 @@ class AgentYapInjector {
 
     button.addEventListener('mouseenter', () => {
       button.style.transform = 'translateY(-1px)'
-      button.style.boxShadow = '0 4px 8px rgba(29, 161, 242, 0.3)'
+      button.style.boxShadow = '0 4px 12px rgba(29, 161, 242, 0.3)'
     })
 
     button.addEventListener('mouseleave', () => {
@@ -312,7 +417,7 @@ class AgentYapInjector {
         const reply = await generateReply(tweetText, selectedTone)
         
         // Fill the reply box
-        this.fillReplyBox(replyBox, reply)
+        await this.fillReplyBox(replyBox, reply)
         
         // Success feedback
         button.style.background = '#10b981'
@@ -361,11 +466,11 @@ class AgentYapInjector {
     button.innerHTML = '🔄 Rewrite Reply'
     button.style.cssText = `
       width: 100%;
-      padding: 6px 12px;
+      padding: 8px 16px;
       background: #6b7280;
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       font-size: 12px;
       font-weight: 500;
       cursor: pointer;
@@ -396,7 +501,7 @@ class AgentYapInjector {
         const newReply = await rewriteReply(currentReply)
         
         // Fill the reply box with new reply
-        this.fillReplyBox(replyBox, newReply)
+        await this.fillReplyBox(replyBox, newReply)
         
         button.innerHTML = '✅ Rewritten!'
         button.dataset.currentReply = newReply
@@ -420,20 +525,17 @@ class AgentYapInjector {
   }
 
   private findTweetTextForReply(replyBox: HTMLElement): string | null {
-    // Look for the tweet we're replying to
-    // This could be in various places depending on Twitter's structure
-    
-    // Method 1: Look for tweet text in the same article
-    let article = replyBox.closest('article')
-    if (article) {
-      const tweetTextElement = article.querySelector('[data-testid="tweetText"]')
+    // Method 1: Look for tweet text in the same article/container
+    let container = replyBox.closest('article')
+    if (container) {
+      const tweetTextElement = container.querySelector('[data-testid="tweetText"]')
       if (tweetTextElement?.textContent) {
         return tweetTextElement.textContent.trim()
       }
     }
 
     // Method 2: Look for tweet text in parent containers
-    let container = replyBox.closest('[data-testid*="tweet"]')
+    container = replyBox.closest('[data-testid*="tweet"]')
     while (container && !container.matches('article')) {
       container = container.parentElement?.closest('[data-testid*="tweet"]') || null
     }
@@ -445,32 +547,60 @@ class AgentYapInjector {
       }
     }
 
-    // Method 3: Look for any tweet text in the vicinity
+    // Method 3: Look for the most recent tweet text on the page
     const allTweetTexts = document.querySelectorAll('[data-testid="tweetText"]')
     if (allTweetTexts.length > 0) {
-      // Return the last one found (most likely the one being replied to)
-      const lastTweet = allTweetTexts[allTweetTexts.length - 1]
-      if (lastTweet.textContent) {
-        return lastTweet.textContent.trim()
+      // Find the tweet text that's closest to our reply box
+      let closestTweet = null
+      let closestDistance = Infinity
+      
+      const replyRect = replyBox.getBoundingClientRect()
+      
+      allTweetTexts.forEach(tweetElement => {
+        const tweetRect = tweetElement.getBoundingClientRect()
+        const distance = Math.abs(tweetRect.bottom - replyRect.top)
+        
+        if (distance < closestDistance && tweetRect.top < replyRect.top) {
+          closestDistance = distance
+          closestTweet = tweetElement
+        }
+      })
+      
+      if (closestTweet?.textContent) {
+        return closestTweet.textContent.trim()
       }
     }
 
     // Method 4: Look for any text content in lang attribute elements
     const langElements = document.querySelectorAll('[lang]')
     for (const element of langElements) {
-      if (element.textContent && element.textContent.trim().length > 10) {
-        return element.textContent.trim()
+      if (element.textContent && element.textContent.trim().length > 20) {
+        const rect = element.getBoundingClientRect()
+        const replyRect = replyBox.getBoundingClientRect()
+        
+        // Only consider elements that are above the reply box
+        if (rect.bottom < replyRect.top) {
+          return element.textContent.trim()
+        }
       }
     }
 
     return null
   }
 
-  private fillReplyBox(replyBox: HTMLElement, text: string) {
+  private async fillReplyBox(replyBox: HTMLElement, text: string): Promise<void> {
     // Focus the reply box
     replyBox.focus()
 
     // Clear existing content
+    if (replyBox.tagName === 'TEXTAREA' || replyBox.tagName === 'INPUT') {
+      (replyBox as HTMLInputElement).value = ''
+    } else {
+      replyBox.textContent = ''
+      replyBox.innerHTML = ''
+    }
+
+    // Set the new content
     if (replyBox.tagName === 'TEXTAREA' || replyBox.tagName === 'INPUT') {
       (replyBox as HTMLInputElement).value = text
     } else {
@@ -478,7 +608,7 @@ class AgentYapInjector {
       replyBox.innerHTML = text
     }
 
-    // Dispatch events to notify Twitter
+    // Dispatch comprehensive events to notify Twitter
     const events = [
       new Event('focus', { bubbles: true }),
       new Event('input', { bubbles: true }),
@@ -489,16 +619,20 @@ class AgentYapInjector {
       }),
       new Event('change', { bubbles: true }),
       new KeyboardEvent('keydown', { bubbles: true, key: 'a' }),
-      new KeyboardEvent('keyup', { bubbles: true, key: 'a' })
+      new KeyboardEvent('keyup', { bubbles: true, key: 'a' }),
+      new Event('compositionstart', { bubbles: true }),
+      new Event('compositionend', { bubbles: true }),
+      new Event('paste', { bubbles: true })
     ]
 
-    events.forEach(event => {
+    for (const event of events) {
       try {
         replyBox.dispatchEvent(event)
+        await new Promise(resolve => setTimeout(resolve, 10))
       } catch (e) {
         console.warn('Could not dispatch event:', e)
       }
-    })
+    }
 
     // Keep focus on the reply box
     replyBox.focus()
@@ -511,12 +645,9 @@ class AgentYapInjector {
       this.observer.disconnect()
     }
     
-    if (this.replyBoxObserver) {
-      this.replyBoxObserver.disconnect()
-    }
-    
     // Remove all injected controls
     document.querySelectorAll('.agentyap-container').forEach(container => container.remove())
+    this.injectedContainers.clear()
   }
 }
 
