@@ -106,7 +106,7 @@ class AgentYapInjector {
       mutations.forEach((mutation) => {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
           // Check for new reply boxes with a slight delay
-          setTimeout(() => this.checkForReplyBoxes(), 200)
+          setTimeout(() => this.checkForReplyBoxes(), 300)
         }
       })
     })
@@ -141,15 +141,20 @@ class AgentYapInjector {
   }
 
   private maybeInjectAIControls(replyBox: HTMLElement) {
-    // Create unique identifier for this reply box
+    // Create unique identifier for this reply box based on its position and content
     const boxId = this.getReplyBoxId(replyBox)
     
-    // Skip if already injected
+    // Skip if already injected for this specific box
     if (this.injectedContainers.has(boxId)) {
       return
     }
 
-    // Skip if this is not actually a reply box (could be main compose)
+    // Check if there's already a YapMate container near this reply box
+    if (this.hasNearbyYapMateContainer(replyBox)) {
+      return
+    }
+
+    // Skip if this is not actually a reply box
     if (!this.isReplyBox(replyBox)) {
       return
     }
@@ -170,10 +175,31 @@ class AgentYapInjector {
   }
 
   private getReplyBoxId(replyBox: HTMLElement): string {
-    // Create a unique ID based on the element's position and attributes
+    // Create a more stable unique ID
     const rect = replyBox.getBoundingClientRect()
     const testId = replyBox.getAttribute('data-testid') || ''
-    return `reply-${testId}-${Math.round(rect.top)}-${Math.round(rect.left)}`
+    const ariaLabel = replyBox.getAttribute('aria-label') || ''
+    
+    // Use a combination of attributes and position for uniqueness
+    return `reply-${testId}-${ariaLabel.slice(0, 10)}-${Math.round(rect.top / 50)}-${Math.round(rect.left / 50)}`
+  }
+
+  private hasNearbyYapMateContainer(replyBox: HTMLElement): boolean {
+    // Check if there's already a YapMate container within reasonable distance
+    const existingContainers = document.querySelectorAll('.agentyap-container')
+    const replyRect = replyBox.getBoundingClientRect()
+    
+    for (const container of existingContainers) {
+      const containerRect = container.getBoundingClientRect()
+      const distance = Math.abs(containerRect.top - replyRect.top) + Math.abs(containerRect.left - replyRect.left)
+      
+      // If there's a container within 200px, consider it nearby
+      if (distance < 200) {
+        return true
+      }
+    }
+    
+    return false
   }
 
   private isReplyBox(replyBox: HTMLElement): boolean {
@@ -200,12 +226,6 @@ class AgentYapInjector {
     }
 
     // Method 2: Check for modal/dialog containers (reply modals)
-    const modalSelectors = [
-      '[role="dialog"]',
-      '[data-testid="modal"]',
-      '.css-1dbjc4n[role="dialog"]'
-    ]
-    
     container = replyBox.closest('[role="dialog"]') || replyBox.closest('[data-testid="modal"]')
     if (container) {
       return true
@@ -237,7 +257,7 @@ class AgentYapInjector {
     container.className = 'agentyap-container'
     container.dataset.boxId = boxId
     container.style.cssText = `
-      margin: 8px 0;
+      margin: 12px 0;
       padding: 12px;
       background: linear-gradient(135deg, #f8fafc, #f1f5f9);
       border-radius: 12px;
@@ -281,17 +301,22 @@ class AgentYapInjector {
     // Find the best place to insert the container
     const insertionPoint = this.findInsertionPoint(replyBox)
     if (insertionPoint) {
-      insertionPoint.appendChild(container)
+      // Insert after the reply box, not inside it
+      if (insertionPoint === replyBox.parentElement) {
+        replyBox.parentElement.insertBefore(container, replyBox.nextSibling)
+      } else {
+        insertionPoint.appendChild(container)
+      }
     }
   }
 
   private findInsertionPoint(replyBox: HTMLElement): HTMLElement | null {
-    // Strategy 1: Look for the reply compose container (most reliable)
+    // Strategy 1: Look for the immediate parent that contains the reply box
     let container = replyBox.parentElement
     let depth = 0
     
-    while (container && depth < 12) {
-      // Look for Twitter's compose/reply container patterns
+    while (container && depth < 8) {
+      // Look for containers that seem to be the reply compose area
       if (
         container.querySelector('[data-testid="toolBar"]') ||
         container.querySelector('[data-testid="tweetButton"]') ||
@@ -299,11 +324,6 @@ class AgentYapInjector {
         container.matches('[data-testid*="compose"]') ||
         container.matches('[data-testid*="reply"]')
       ) {
-        // Found a compose container, insert after the toolbar or before the tweet button
-        const toolbar = container.querySelector('[data-testid="toolBar"]')
-        if (toolbar && toolbar.parentElement) {
-          return toolbar.parentElement
-        }
         return container
       }
       container = container.parentElement
@@ -313,11 +333,9 @@ class AgentYapInjector {
     // Strategy 2: Look for modal dialog containers
     const modalContainer = replyBox.closest('[role="dialog"]')
     if (modalContainer) {
-      // Find a good spot within the modal
+      // Find the content area within the modal
       const modalContent = modalContainer.querySelector('[data-testid="modal"]') || modalContainer
-      if (modalContent) {
-        return modalContent as HTMLElement
-      }
+      return modalContent as HTMLElement
     }
 
     // Strategy 3: Look for form containers
@@ -326,19 +344,7 @@ class AgentYapInjector {
       return formContainer
     }
 
-    // Strategy 4: Find the immediate container that has the reply box
-    container = replyBox.parentElement
-    depth = 0
-    while (container && depth < 5) {
-      // Look for containers that seem to wrap the entire reply area
-      if (container.children.length <= 3 && container.offsetHeight > 100) {
-        return container
-      }
-      container = container.parentElement
-      depth++
-    }
-
-    // Fallback: use the direct parent
+    // Strategy 4: Use the direct parent
     return replyBox.parentElement
   }
 

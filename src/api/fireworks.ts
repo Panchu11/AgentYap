@@ -37,7 +37,7 @@ export async function fireworksAPI(prompt: string): Promise<string> {
         messages: [
           {
             role: 'system',
-            content: 'You are a crypto Twitter expert who writes authentic, engaging replies. Generate natural responses without quotes or formal language. Write like a real person tweeting - casual, direct, and conversational. Always include the requested handles, tickers, and hashtags naturally. Keep responses under 280 characters and make them sound like genuine crypto Twitter interactions.'
+            content: 'You are a social media expert who writes authentic, engaging replies. Analyze the tweet content and respond naturally. Determine appropriate mentions, hashtags, and tickers based on the actual content - do not use generic placeholders. Write like a real person engaging in conversation. Keep responses under 280 characters and make them sound genuine.'
           },
           {
             role: 'user',
