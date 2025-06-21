@@ -1,3 +1,6 @@
+import { generateReply } from '../utils/generateReply'
+import { rewriteReply } from '../utils/rewriteReply'
+
 class AgentYapInjector {
   private observer: MutationObserver | null = null
   private replyBoxObserver: MutationObserver | null = null
@@ -297,7 +300,7 @@ class AgentYapInjector {
 
       // Get selected tone
       const container = button.closest('.agentyap-container')
-      const selectedTone = container?.querySelector('.agentyap-tone-btn.selected')?.dataset.tone || 'Smart'
+      const selectedTone = (container?.querySelector('.agentyap-tone-btn.selected') as HTMLElement)?.dataset.tone || 'Smart'
 
       // Show loading state
       button.style.background = '#0d8bd9'
