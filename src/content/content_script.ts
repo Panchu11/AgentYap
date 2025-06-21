@@ -409,7 +409,7 @@ class AgentYapInjector {
         (element as HTMLInputElement).value += char
       } else {
         element.textContent += char
-        element.innerHTML = element.textContent
+        element.innerHTML = element.textContent || ''
       }
 
       // Dispatch input event for each character
