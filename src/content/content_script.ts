@@ -17,7 +17,7 @@ class AgentYapInjector {
       this.startObserving()
     }
 
-    // Listen for messages from popup
+    // Listen for messages from popup - with proper error handling
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       this.handleMessage(message, sendResponse)
       return true // Keep message channel open for async response
@@ -30,10 +30,15 @@ class AgentYapInjector {
         case 'GENERATE_REPLY':
           try {
             const reply = await generateReply(message.tweetText, message.tone)
-            chrome.runtime.sendMessage({
-              type: 'REPLY_GENERATED',
-              reply: reply
-            })
+            // Send reply back to popup
+            try {
+              chrome.runtime.sendMessage({
+                type: 'REPLY_GENERATED',
+                reply: reply
+              })
+            } catch (e) {
+              console.warn('Could not send message to popup:', e)
+            }
             sendResponse({ success: true, reply })
           } catch (error) {
             console.error('Error generating reply:', error)
@@ -45,10 +50,14 @@ class AgentYapInjector {
         case 'REWRITE_REPLY':
           try {
             const newReply = await rewriteReply(message.originalReply)
-            chrome.runtime.sendMessage({
-              type: 'REPLY_GENERATED',
-              reply: newReply
-            })
+            try {
+              chrome.runtime.sendMessage({
+                type: 'REPLY_GENERATED',
+                reply: newReply
+              })
+            } catch (e) {
+              console.warn('Could not send message to popup:', e)
+            }
             sendResponse({ success: true, reply: newReply })
           } catch (error) {
             console.error('Error rewriting reply:', error)
@@ -190,72 +199,23 @@ class AgentYapInjector {
         if (replyButton) {
           replyButton.click()
           
-          // Wait for reply box to appear
-          await this.waitForElement('[data-testid="tweetTextarea_0"]', 5000)
+          // Wait for reply box to appear with multiple attempts
+          await this.waitForReplyBox()
         }
         
         // Generate the reply
         const reply = await generateReply(tweetText, 'Smart') // Default to Smart tone
         
-        // Find and fill the reply textarea
-        const replyTextarea = document.querySelector('[data-testid="tweetTextarea_0"]') as HTMLTextAreaElement
-        if (replyTextarea) {
-          // Focus and clear existing content
-          replyTextarea.focus()
-          replyTextarea.value = ''
-          
-          // Set the value using multiple methods to ensure Twitter recognizes it
-          replyTextarea.value = reply
-          replyTextarea.textContent = reply
-          
-          // Trigger multiple events to ensure Twitter recognizes the change
-          const events = [
-            new Event('input', { bubbles: true }),
-            new Event('change', { bubbles: true }),
-            new KeyboardEvent('keydown', { bubbles: true }),
-            new KeyboardEvent('keyup', { bubbles: true })
-          ]
-          
-          events.forEach(event => replyTextarea.dispatchEvent(event))
-          
-          // Also try setting innerHTML for the contenteditable div if it exists
-          const editableDiv = replyTextarea.closest('[contenteditable="true"]') as HTMLElement
-          if (editableDiv) {
-            editableDiv.textContent = reply
-            editableDiv.innerHTML = reply
-            events.forEach(event => editableDiv.dispatchEvent(event))
-          }
-          
-          // Try alternative selectors for the reply box
-          const alternativeSelectors = [
-            '[data-testid="tweetTextarea_0"]',
-            '[role="textbox"]',
-            '.public-DraftEditor-content',
-            '.notranslate'
-          ]
-          
-          for (const selector of alternativeSelectors) {
-            const element = document.querySelector(selector) as HTMLElement
-            if (element && element !== replyTextarea) {
-              element.textContent = reply
-              if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
-                (element as HTMLInputElement).value = reply
-              }
-              events.forEach(event => element.dispatchEvent(event))
-            }
-          }
-          
-          // Success feedback
-          button.style.background = '#10B981'
-          button.innerHTML = '✅ Reply Added!'
-          button.disabled = false
-          
-          // Add rewrite button
-          this.addRewriteButton(button, reply, replyTextarea)
-          
-        } else {
-          throw new Error('Could not find reply textarea')
-        }
+        // Find and fill the reply textarea with multiple methods
+        await this.fillReplyBox(reply)
+        
+        // Success feedback
+        button.style.background = '#10B981'
+        button.innerHTML = '✅ Reply Added!'
+        button.disabled = false
+        
+        // Add rewrite button
+        this.addRewriteButton(button, reply)
         
       } catch (error) {
         console.error('Error generating reply:', error)
@@ -274,7 +234,96 @@ class AgentYapInjector {
     actionBar.appendChild(button)
   }
 
-  private addRewriteButton(originalButton: HTMLElement, currentReply: string, textarea: HTMLTextAreaElement) {
+  private async waitForReplyBox(): Promise<void> {
+    const selectors = [
+      '[data-testid="tweetTextarea_0"]',
+      '[role="textbox"]',
+      '.public-DraftEditor-content',
+      '.notranslate',
+      '[contenteditable="true"]'
+    ]
+
+    for (let attempt = 0; attempt < 10; attempt++) {
+      for (const selector of selectors) {
+        const element = document.querySelector(selector)
+        if (element) {
+          console.log(`Found reply box with selector: ${selector}`)
+          return
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 300))
+    }
+    
+    throw new Error('Could not find reply textarea after multiple attempts')
+  }
+
+  private async fillReplyBox(reply: string): Promise<void> {
+    const selectors = [
+      '[data-testid="tweetTextarea_0"]',
+      '[role="textbox"]',
+      '.public-DraftEditor-content',
+      '.notranslate',
+      '[contenteditable="true"]'
+    ]
+
+    let filled = false
+
+    for (const selector of selectors) {
+      const element = document.querySelector(selector) as HTMLElement
+      if (element) {
+        try {
+          // Focus the element
+          element.focus()
+          
+          // Clear existing content
+          if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+            (element as HTMLInputElement).value = ''
+          } else {
+            element.textContent = ''
+            element.innerHTML = ''
+          }
+
+          // Set the new content
+          if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+            (element as HTMLInputElement).value = reply
+          } else {
+            element.textContent = reply
+            element.innerHTML = reply
+          }
+
+          // Trigger events to notify Twitter
+          const events = [
+            new Event('focus', { bubbles: true }),
+            new Event('input', { bubbles: true }),
+            new Event('change', { bubbles: true }),
+            new KeyboardEvent('keydown', { bubbles: true, key: 'a' }),
+            new KeyboardEvent('keyup', { bubbles: true, key: 'a' }),
+            new Event('blur', { bubbles: true })
+          ]
+
+          events.forEach(event => {
+            try {
+              element.dispatchEvent(event)
+            } catch (e) {
+              console.warn('Could not dispatch event:', e)
+            }
+          })
+
+          console.log(`Successfully filled reply box using selector: ${selector}`)
+          filled = true
+          break
+        } catch (e) {
+          console.warn(`Failed to fill element with selector ${selector}:`, e)
+        }
+      }
+    }
+
+    if (!filled) {
+      throw new Error('Could not fill any reply textarea')
+    }
+  }
+
+  private addRewriteButton(originalButton: HTMLElement, currentReply: string) {
     // Remove any existing rewrite button
     const existingRewrite = originalButton.parentElement?.querySelector('.agentyap-rewrite-btn')
     if (existingRewrite) {
@@ -311,26 +360,8 @@ class AgentYapInjector {
       try {
         const newReply = await rewriteReply(currentReply)
         
-        // Update textarea with same method as original
-        textarea.focus()
-        textarea.value = newReply
-        textarea.textContent = newReply
-        
-        const events = [
-          new Event('input', { bubbles: true }),
-          new Event('change', { bubbles: true }),
-          new KeyboardEvent('keydown', { bubbles: true }),
-          new KeyboardEvent('keyup', { bubbles: true })
-        ]
-        
-        events.forEach(event => textarea.dispatchEvent(event))
-        
-        const editableDiv = textarea.closest('[contenteditable="true"]') as HTMLElement
-        if (editableDiv) {
-          editableDiv.textContent = newReply
-          editableDiv.innerHTML = newReply
-          events.forEach(event => editableDiv.dispatchEvent(event))
-        }
+        // Fill the reply box with the new reply
+        await this.fillReplyBox(newReply)
         
         rewriteButton.innerHTML = '✅ Rewritten!'
         
@@ -339,7 +370,7 @@ class AgentYapInjector {
           rewriteButton.innerHTML = '🔄 Rewrite'
           rewriteButton.disabled = false
           // Update the rewrite button to use the new reply
-          this.addRewriteButton(originalButton, newReply, textarea)
+          this.addRewriteButton(originalButton, newReply)
         }, 2000)
         
       } catch (error) {
@@ -354,34 +385,6 @@ class AgentYapInjector {
 
     // Insert after the original button
     originalButton.parentElement?.insertBefore(rewriteButton, originalButton.nextSibling)
-  }
-
-  private waitForElement(selector: string, timeout: number = 5000): Promise<Element> {
-    return new Promise((resolve, reject) => {
-      const element = document.querySelector(selector)
-      if (element) {
-        resolve(element)
-        return
-      }
-
-      const observer = new MutationObserver((mutations) => {
-        const element = document.querySelector(selector)
-        if (element) {
-          observer.disconnect()
-          resolve(element)
-        }
-      })
-
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true
-      })
-
-      setTimeout(() => {
-        observer.disconnect()
-        reject(new Error(`Element ${selector} not found within ${timeout}ms`))
-      }, timeout)
-    })
   }
 
   public destroy() {
