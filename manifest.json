@@ -6,7 +6,8 @@
   "permissions": [
     "scripting",
     "activeTab",
-    "storage"
+    "storage",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://x.com/*",
@@ -21,8 +22,10 @@
     }
   ],
   "action": {
-    "default_popup": "popup.html",
-    "default_title": "YapMate"
+    "default_title": "YapMate - Open Sidebar"
+  },
+  "side_panel": {
+    "default_path": "sidebar.html"
   },
   "icons": {
     "16": "icons/icon16.png",
