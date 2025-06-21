@@ -105,8 +105,8 @@ class AgentYapInjector {
 
       mutations.forEach((mutation) => {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          // Check for new reply boxes
-          setTimeout(() => this.checkForReplyBoxes(), 100)
+          // Check for new reply boxes with a slight delay
+          setTimeout(() => this.checkForReplyBoxes(), 200)
         }
       })
     })
@@ -121,13 +121,15 @@ class AgentYapInjector {
   }
 
   private checkForReplyBoxes() {
-    // Look for reply textareas/compose boxes
+    // Look for reply textareas/compose boxes with more specific selectors
     const replySelectors = [
       '[data-testid="tweetTextarea_0"]',
-      '[data-testid="tweetTextarea_1"]',
+      '[data-testid="tweetTextarea_1"]', 
       '[role="textbox"][data-testid*="tweet"]',
       '.public-DraftEditor-content',
-      '[contenteditable="true"][data-testid*="tweet"]'
+      '[contenteditable="true"][data-testid*="tweet"]',
+      '[contenteditable="true"][aria-label*="reply"]',
+      '[contenteditable="true"][aria-label*="Reply"]'
     ]
 
     for (const selector of replySelectors) {
@@ -175,19 +177,19 @@ class AgentYapInjector {
   }
 
   private isReplyBox(replyBox: HTMLElement): boolean {
-    // Check if this is actually a reply box and not the main compose box
+    // Enhanced reply box detection
     
-    // Method 1: Look for reply-specific indicators
+    // Method 1: Check for reply-specific indicators in the DOM hierarchy
     const replyIndicators = [
       '[data-testid*="reply"]',
-      '.css-1dbjc4n[data-testid*="reply"]',
       '[aria-label*="reply"]',
-      '[aria-label*="Reply"]'
+      '[aria-label*="Reply"]',
+      '[data-testid="toolBar"]' // Twitter's reply toolbar
     ]
 
     let container = replyBox.parentElement
     let depth = 0
-    while (container && depth < 10) {
+    while (container && depth < 15) { // Increased search depth
       for (const indicator of replyIndicators) {
         if (container.querySelector(indicator) || container.matches(indicator)) {
           return true
@@ -197,14 +199,32 @@ class AgentYapInjector {
       depth++
     }
 
-    // Method 2: Check if we can find a tweet being replied to nearby
+    // Method 2: Check for modal/dialog containers (reply modals)
+    const modalSelectors = [
+      '[role="dialog"]',
+      '[data-testid="modal"]',
+      '.css-1dbjc4n[role="dialog"]'
+    ]
+    
+    container = replyBox.closest('[role="dialog"]') || replyBox.closest('[data-testid="modal"]')
+    if (container) {
+      return true
+    }
+
+    // Method 3: Check if we can find a tweet being replied to nearby
     const nearbyTweet = this.findTweetTextForReply(replyBox)
     if (nearbyTweet) {
       return true
     }
 
-    // Method 3: Check URL for reply context
-    if (window.location.href.includes('/status/') && window.location.href.includes('reply')) {
+    // Method 4: Check URL for reply context
+    if (window.location.href.includes('/status/')) {
+      return true
+    }
+
+    // Method 5: Check for compose tweet indicators (exclude main compose)
+    const isMainCompose = replyBox.closest('[data-testid="toolBar"]')?.querySelector('[data-testid="toolBar"]')
+    if (!isMainCompose && replyBox.getAttribute('data-testid')?.includes('tweet')) {
       return true
     }
 
@@ -217,13 +237,16 @@ class AgentYapInjector {
     container.className = 'agentyap-container'
     container.dataset.boxId = boxId
     container.style.cssText = `
-      margin-top: 12px;
+      margin: 8px 0;
       padding: 12px;
       background: linear-gradient(135deg, #f8fafc, #f1f5f9);
       border-radius: 12px;
       border: 1px solid #e2e8f0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      position: relative;
+      z-index: 1000;
+      max-width: 100%;
     `
 
     // Create header
@@ -263,15 +286,52 @@ class AgentYapInjector {
   }
 
   private findInsertionPoint(replyBox: HTMLElement): HTMLElement | null {
-    // Try to find the reply container or compose area
+    // Strategy 1: Look for the reply compose container (most reliable)
     let container = replyBox.parentElement
     let depth = 0
     
-    while (container && depth < 8) {
-      // Look for common Twitter reply container patterns
-      if (container.querySelector('[data-testid*="reply"]') ||
-          container.querySelector('[role="button"][data-testid*="tweet"]') ||
-          container.matches('[data-testid*="reply"]')) {
+    while (container && depth < 12) {
+      // Look for Twitter's compose/reply container patterns
+      if (
+        container.querySelector('[data-testid="toolBar"]') ||
+        container.querySelector('[data-testid="tweetButton"]') ||
+        container.querySelector('[data-testid="tweetButtonInline"]') ||
+        container.matches('[data-testid*="compose"]') ||
+        container.matches('[data-testid*="reply"]')
+      ) {
+        // Found a compose container, insert after the toolbar or before the tweet button
+        const toolbar = container.querySelector('[data-testid="toolBar"]')
+        if (toolbar && toolbar.parentElement) {
+          return toolbar.parentElement
+        }
+        return container
+      }
+      container = container.parentElement
+      depth++
+    }
+
+    // Strategy 2: Look for modal dialog containers
+    const modalContainer = replyBox.closest('[role="dialog"]')
+    if (modalContainer) {
+      // Find a good spot within the modal
+      const modalContent = modalContainer.querySelector('[data-testid="modal"]') || modalContainer
+      if (modalContent) {
+        return modalContent as HTMLElement
+      }
+    }
+
+    // Strategy 3: Look for form containers
+    const formContainer = replyBox.closest('form')
+    if (formContainer) {
+      return formContainer
+    }
+
+    // Strategy 4: Find the immediate container that has the reply box
+    container = replyBox.parentElement
+    depth = 0
+    while (container && depth < 5) {
+      // Look for containers that seem to wrap the entire reply area
+      if (container.children.length <= 3 && container.offsetHeight > 100) {
         return container
       }
       container = container.parentElement
@@ -534,7 +594,16 @@ class AgentYapInjector {
       }
     }
 
-    // Method 2: Look for tweet text in parent containers
+    // Method 2: Look for tweet text in modal dialogs (for reply modals)
+    const modalContainer = replyBox.closest('[role="dialog"]')
+    if (modalContainer) {
+      const tweetTextElement = modalContainer.querySelector('[data-testid="tweetText"]')
+      if (tweetTextElement?.textContent) {
+        return tweetTextElement.textContent.trim()
+      }
+    }
+
+    // Method 3: Look for tweet text in parent containers
     container = replyBox.closest('[data-testid*="tweet"]')
     while (container && !container.matches('article')) {
       container = container.parentElement?.closest('[data-testid*="tweet"]') || null
@@ -547,7 +616,7 @@ class AgentYapInjector {
       }
     }
 
-    // Method 3: Look for the most recent tweet text on the page
+    // Method 4: Look for the most recent tweet text on the page
     const allTweetTexts = document.querySelectorAll('[data-testid="tweetText"]')
     if (allTweetTexts.length > 0) {
       // Find the tweet text that's closest to our reply box
@@ -575,7 +644,7 @@ class AgentYapInjector {
       }
     }
 
-    // Method 4: Look for any text content in lang attribute elements
+    // Method 5: Look for any text content in lang attribute elements
     const langElements = document.querySelectorAll('[lang]')
     for (const element of langElements) {
       if (element.textContent && element.textContent.trim().length > 20) {
