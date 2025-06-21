@@ -37,7 +37,7 @@ export async function fireworksAPI(prompt: string): Promise<string> {
         messages: [
           {
             role: 'system',
-            content: 'You are a crypto Twitter expert. Generate authentic, engaging replies that sound natural and human. Always include the requested handles, tickers, and hashtags. Keep responses under 280 characters.'
+            content: 'You are a crypto Twitter expert who writes authentic, engaging replies. Generate natural responses without quotes or formal language. Write like a real person tweeting - casual, direct, and conversational. Always include the requested handles, tickers, and hashtags naturally. Keep responses under 280 characters and make them sound like genuine crypto Twitter interactions.'
           },
           {
             role: 'user',
@@ -45,8 +45,8 @@ export async function fireworksAPI(prompt: string): Promise<string> {
           }
         ],
         max_tokens: 150,
-        temperature: 0.8,
-        top_p: 0.9
+        temperature: 0.9,
+        top_p: 0.95
       })
     })
 
@@ -68,8 +68,16 @@ export async function fireworksAPI(prompt: string): Promise<string> {
       throw new Error('Invalid API response format')
     }
 
-    const reply = data.choices[0].message.content.trim()
-    return reply.replace(/^(Reply:|Response:)\s*/i, '').trim()
+    let reply = data.choices[0].message.content.trim()
+    
+    // Clean up the reply to remove quotes and formal language
+    reply = reply
+      .replace(/^(Reply:|Response:)\s*/i, '')
+      .replace(/^["']|["']$/g, '') // Remove quotes at start/end
+      .replace(/^@\w+\s+/, '') // Remove leading @ mentions that might be duplicated
+      .trim()
+
+    return reply
     
   } catch (error) {
     console.error('Fireworks API error:', error)

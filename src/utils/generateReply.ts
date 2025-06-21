@@ -32,10 +32,10 @@ export async function generateReply(tweetText: string, tone: string): Promise<st
 
 function buildPrompt(tweetText: string, tone: string, projectMeta: any): string {
   const instructions = {
-    Smart: 'Write an analytical and insightful reply',
-    Funny: 'Write a witty and entertaining reply with humor',
-    Serious: 'Write a professional and direct reply',
-    Degen: 'Write a bold and crypto-native reply with slang and emojis'
+    Smart: 'Write an analytical and insightful reply that shows deep understanding',
+    Funny: 'Write a witty and entertaining reply with humor that fits crypto Twitter culture',
+    Serious: 'Write a professional and direct reply that adds value to the conversation',
+    Degen: 'Write a bold and crypto-native reply with appropriate slang and energy'
   }
 
   // Build specific context based on detected project
@@ -47,13 +47,15 @@ function buildPrompt(tweetText: string, tone: string, projectMeta: any): string 
 - This tweet is about ${projectMeta.handle} specifically
 - MUST include: @${projectMeta.handle}, $${projectMeta.ticker}, ${projectMeta.hashtags.join(' ')}
 - Reference the specific project context and features mentioned in the tweet
-- Be knowledgeable about ${projectMeta.handle} and its ecosystem`
+- Show knowledge about ${projectMeta.handle} and its ecosystem
+- Write like a genuine community member who understands the project`
   } else if (projectMeta?.handle === 'crypto') {
     // Generic crypto content
     contextInstructions = `
 - This is general crypto/blockchain content
 - Include: @crypto, $CRYPTO, ${projectMeta.hashtags.join(' ')}
-- Use crypto Twitter terminology and tone`
+- Use crypto Twitter terminology and culture
+- Write like an experienced crypto native`
   } else {
     // Non-crypto content
     contextInstructions = `
@@ -67,11 +69,14 @@ function buildPrompt(tweetText: string, tone: string, projectMeta: any): string 
 
 Instructions:
 - ${instructions[tone as keyof typeof instructions]}${contextInstructions}
-- Max 280 characters, natural, authentic tone
-- Be engaging and relevant to the specific topic discussed
-- ${tone === 'Degen' ? 'Use appropriate slang and emojis for the context' : ''}
-- ${tone === 'Funny' ? 'Add humor but keep it relevant to the topic' : ''}
-- IMPORTANT: Always use the EXACT handles, tickers, and hashtags specified above
+- Max 280 characters, natural, conversational tone
+- Write like a real person tweeting, not a bot
+- Be engaging and add value to the conversation
+- ${tone === 'Degen' ? 'Use appropriate crypto slang and energy but keep it authentic' : ''}
+- ${tone === 'Funny' ? 'Add humor that fits the context and crypto Twitter culture' : ''}
+- CRITICAL: Always include the EXACT handles, tickers, and hashtags specified above
+- NO quotes around the reply, write it as a direct tweet
+- Sound like genuine crypto Twitter engagement, not corporate speak
 
 Reply:`
 }
