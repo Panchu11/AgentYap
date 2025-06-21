@@ -25,7 +25,7 @@ export async function generateReply(tweetText: string, tone: string): Promise<st
   } catch (error) {
     console.error('Error in generateReply:', error)
     // Ultimate fallback - projectMeta is now accessible here
-    return `Great point! ${projectMeta?.handle ? `@${projectMeta.handle}` : ''} ${projectMeta?.ticker ? `$${projectMeta.ticker}` : ''} ${projectMeta?.hashtags?.[0] || '#discussion'}`
+    return `Great point! ${projectMeta?.handle ? `@${projectMeta.handle}` : ''} ${projectMeta?.ticker ? `$${projectMeta.ticker}` : ''} ${projectMeta?.hashtags?.[0] || '#crypto'}`
   }
 }
 
@@ -37,34 +37,15 @@ function buildPrompt(tweetText: string, tone: string, projectMeta: any): string 
     Degen: 'Write a bold and crypto-native reply with slang and emojis'
   }
 
-  // Determine if this is crypto content
-  const isCrypto = projectMeta?.handle === 'crypto' || 
-                   ['Kaito', 'CreatorBid', 'solana', 'ethereum', 'bitcoin', 'DeFi', 'NFT'].includes(projectMeta?.handle)
-
-  // Build context-aware prompt
-  let contextInstructions = ''
-  if (isCrypto) {
-    contextInstructions = `
-- This is crypto/blockchain related content
-- Include: ${projectMeta?.handle ? `@${projectMeta.handle}` : '@crypto'}, ${projectMeta?.ticker ? `$${projectMeta.ticker}` : '$CRYPTO'}, ${projectMeta?.hashtags?.join(' ') || '#crypto #web3'}
-- Use crypto Twitter terminology and tone`
-  } else {
-    contextInstructions = `
-- This is general social media content (not crypto-specific)
-- Include relevant handles and hashtags: ${projectMeta?.hashtags?.join(' ') || '#discussion #social'}
-- Keep it conversational and engaging
-- DO NOT use crypto-specific terms, tickers, or hashtags unless the original tweet is about crypto`
-  }
-
   return `Tweet: "${tweetText}"
 
 Instructions:
-- ${instructions[tone as keyof typeof instructions]}${contextInstructions}
-- Max 280 characters, natural tone
+- ${instructions[tone as keyof typeof instructions]}
+- Include: ${projectMeta?.handle ? `@${projectMeta.handle}` : '@project'}, ${projectMeta?.ticker ? `$${projectMeta.ticker}` : '$TOKEN'}, ${projectMeta?.hashtags?.join(' ') || '#crypto #web3'}
+- Max 280 characters, natural, bold CT tone
 - Be authentic and engaging
-- ${tone === 'Degen' && isCrypto ? 'Use crypto slang and rocket emojis' : ''}
+- ${tone === 'Degen' ? 'Use crypto slang and rocket emojis' : ''}
 - ${tone === 'Funny' ? 'Add humor but keep it relevant' : ''}
-- Match the topic and tone of the original tweet
 
 Reply:`
 }
