@@ -20,41 +20,46 @@ class AgentYapInjector {
     // Listen for messages from popup
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       this.handleMessage(message, sendResponse)
+      return true // Keep message channel open for async response
     })
   }
 
   private async handleMessage(message: any, sendResponse: (response?: any) => void) {
-    switch (message.type) {
-      case 'GENERATE_REPLY':
-        try {
-          const reply = await generateReply(message.tweetText, message.tone)
-          // Send reply back to popup
-          chrome.runtime.sendMessage({
-            type: 'REPLY_GENERATED',
-            reply: reply
-          })
-          sendResponse({ success: true, reply })
-        } catch (error) {
-          console.error('Error generating reply:', error)
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-          sendResponse({ success: false, error: errorMessage })
-        }
-        break
+    try {
+      switch (message.type) {
+        case 'GENERATE_REPLY':
+          try {
+            const reply = await generateReply(message.tweetText, message.tone)
+            chrome.runtime.sendMessage({
+              type: 'REPLY_GENERATED',
+              reply: reply
+            })
+            sendResponse({ success: true, reply })
+          } catch (error) {
+            console.error('Error generating reply:', error)
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+            sendResponse({ success: false, error: errorMessage })
+          }
+          break
 
-      case 'REWRITE_REPLY':
-        try {
-          const newReply = await rewriteReply(message.originalReply)
-          chrome.runtime.sendMessage({
-            type: 'REPLY_GENERATED',
-            reply: newReply
-          })
-          sendResponse({ success: true, reply: newReply })
-        } catch (error) {
-          console.error('Error rewriting reply:', error)
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-          sendResponse({ success: false, error: errorMessage })
-        }
-        break
+        case 'REWRITE_REPLY':
+          try {
+            const newReply = await rewriteReply(message.originalReply)
+            chrome.runtime.sendMessage({
+              type: 'REPLY_GENERATED',
+              reply: newReply
+            })
+            sendResponse({ success: true, reply: newReply })
+          } catch (error) {
+            console.error('Error rewriting reply:', error)
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+            sendResponse({ success: false, error: errorMessage })
+          }
+          break
+      }
+    } catch (error) {
+      console.error('Error in handleMessage:', error)
+      sendResponse({ success: false, error: 'Message handling failed' })
     }
   }
 
@@ -135,6 +140,9 @@ class AgentYapInjector {
     const actionBar = tweet.querySelector('[role="group"]')
     if (!actionBar) return
 
+    // Check if button already exists
+    if (actionBar.querySelector('.agentyap-reply-btn')) return
+
     // Create our button
     const button = document.createElement('button')
     button.className = 'agentyap-reply-btn'
@@ -151,6 +159,8 @@ class AgentYapInjector {
       margin-left: 8px;
       transition: all 0.2s ease;
       box-shadow: 0 2px 4px rgba(29, 161, 242, 0.2);
+      z-index: 1000;
+      position: relative;
     `
 
     // Add hover effects
@@ -181,7 +191,7 @@ class AgentYapInjector {
           replyButton.click()
           
           // Wait for reply box to appear
-          await this.waitForElement('[data-testid="tweetTextarea_0"]', 3000)
+          await this.waitForElement('[data-testid="tweetTextarea_0"]', 5000)
         }
         
         // Generate the reply
@@ -190,21 +200,49 @@ class AgentYapInjector {
         // Find and fill the reply textarea
         const replyTextarea = document.querySelector('[data-testid="tweetTextarea_0"]') as HTMLTextAreaElement
         if (replyTextarea) {
-          // Set the value and trigger events to make Twitter recognize the change
+          // Focus and clear existing content
           replyTextarea.focus()
-          replyTextarea.value = reply
+          replyTextarea.value = ''
           
-          // Trigger input events
-          const inputEvent = new Event('input', { bubbles: true })
-          const changeEvent = new Event('change', { bubbles: true })
-          replyTextarea.dispatchEvent(inputEvent)
-          replyTextarea.dispatchEvent(changeEvent)
+          // Set the value using multiple methods to ensure Twitter recognizes it
+          replyTextarea.value = reply
+          replyTextarea.textContent = reply
+          
+          // Trigger multiple events to ensure Twitter recognizes the change
+          const events = [
+            new Event('input', { bubbles: true }),
+            new Event('change', { bubbles: true }),
+            new KeyboardEvent('keydown', { bubbles: true }),
+            new KeyboardEvent('keyup', { bubbles: true })
+          ]
+          
+          events.forEach(event => replyTextarea.dispatchEvent(event))
           
           // Also try setting innerHTML for the contenteditable div if it exists
-          const editableDiv = replyTextarea.closest('[contenteditable="true"]')
+          const editableDiv = replyTextarea.closest('[contenteditable="true"]') as HTMLElement
           if (editableDiv) {
             editableDiv.textContent = reply
-            editableDiv.dispatchEvent(inputEvent)
+            editableDiv.innerHTML = reply
+            events.forEach(event => editableDiv.dispatchEvent(event))
+          }
+          
+          // Try alternative selectors for the reply box
+          const alternativeSelectors = [
+            '[data-testid="tweetTextarea_0"]',
+            '[role="textbox"]',
+            '.public-DraftEditor-content',
+            '.notranslate'
+          ]
+          
+          for (const selector of alternativeSelectors) {
+            const element = document.querySelector(selector) as HTMLElement
+            if (element && element !== replyTextarea) {
+              element.textContent = reply
+              if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+                (element as HTMLInputElement).value = reply
+              }
+              events.forEach(event => element.dispatchEvent(event))
+            }
           }
           
           // Success feedback
@@ -259,6 +297,8 @@ class AgentYapInjector {
       margin-left: 8px;
       transition: all 0.2s ease;
       box-shadow: 0 2px 4px rgba(107, 116, 128, 0.2);
+      z-index: 1000;
+      position: relative;
     `
 
     rewriteButton.addEventListener('click', async (e) => {
@@ -271,17 +311,25 @@ class AgentYapInjector {
       try {
         const newReply = await rewriteReply(currentReply)
         
-        // Update textarea
+        // Update textarea with same method as original
         textarea.focus()
         textarea.value = newReply
+        textarea.textContent = newReply
         
-        const inputEvent = new Event('input', { bubbles: true })
-        textarea.dispatchEvent(inputEvent)
+        const events = [
+          new Event('input', { bubbles: true }),
+          new Event('change', { bubbles: true }),
+          new KeyboardEvent('keydown', { bubbles: true }),
+          new KeyboardEvent('keyup', { bubbles: true })
+        ]
         
-        const editableDiv = textarea.closest('[contenteditable="true"]')
+        events.forEach(event => textarea.dispatchEvent(event))
+        
+        const editableDiv = textarea.closest('[contenteditable="true"]') as HTMLElement
         if (editableDiv) {
           editableDiv.textContent = newReply
-          editableDiv.dispatchEvent(inputEvent)
+          editableDiv.innerHTML = newReply
+          events.forEach(event => editableDiv.dispatchEvent(event))
         }
         
         rewriteButton.innerHTML = '✅ Rewritten!'

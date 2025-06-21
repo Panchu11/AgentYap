@@ -13,7 +13,7 @@ export default defineConfig({
       output: {
         entryFileNames: (chunkInfo) => {
           if (chunkInfo.name === 'content') {
-            return 'src/content/[name].js'
+            return 'src/content/content.js'
           }
           return 'assets/[name]-[hash].js'
         }
