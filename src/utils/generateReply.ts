@@ -2,7 +2,7 @@ import { fireworksAPI } from '../api/fireworks'
 
 export async function generateReply(tweetText: string, tone: string): Promise<string> {
   try {
-    // Build the prompt with dynamic content detection
+    // Build the prompt with enhanced crypto project detection
     const prompt = buildPrompt(tweetText, tone)
     
     // Try API call first
@@ -24,9 +24,9 @@ export async function generateReply(tweetText: string, tone: string): Promise<st
 function buildPrompt(tweetText: string, tone: string): string {
   const instructions = {
     Smart: 'Write an analytical and insightful reply that shows deep understanding',
-    Funny: 'Write a witty and entertaining reply with humor that fits the context',
+    Funny: 'Write a witty and entertaining reply with humor that fits crypto Twitter culture',
     Serious: 'Write a professional and direct reply that adds value to the conversation',
-    Degen: 'Write a bold and energetic reply with appropriate slang'
+    Degen: 'Write a bold and energetic reply with appropriate crypto slang and energy'
   }
 
   return `Tweet: "${tweetText}"
@@ -36,43 +36,66 @@ Instructions:
 - Max 280 characters, natural, conversational tone
 - Write like a real person tweeting, not a bot
 - Be engaging and add value to the conversation
-- Analyze the tweet content and determine appropriate:
-  * Relevant handles/mentions to include (if any)
-  * Appropriate ticker symbols (if crypto/finance related)
-  * Relevant hashtags that fit the topic
-- DO NOT use generic placeholders like @crypto or $CRYPTO
-- Only include handles, tickers, and hashtags that are genuinely relevant to the tweet content
-- If the tweet is about a specific project/person, mention them appropriately
-- If it's general content, use relevant hashtags for the topic discussed
-- ${tone === 'Degen' ? 'Use appropriate slang and energy but keep it authentic' : ''}
-- ${tone === 'Funny' ? 'Add humor that fits the context and topic' : ''}
+- CRITICAL: Analyze the tweet content and identify:
+  * Specific crypto projects mentioned (Bitcoin, Ethereum, Solana, etc.)
+  * People or influencers mentioned (@handles)
+  * Relevant ticker symbols ($BTC, $ETH, $SOL, etc.)
+  * Appropriate hashtags for the topic (#Bitcoin, #DeFi, #NFT, etc.)
+- Include relevant mentions, tickers, and hashtags based on what's actually discussed
+- If the tweet mentions a specific crypto project, include their official handle and ticker
+- If it's about DeFi, include relevant DeFi hashtags and mentions
+- If it's about NFTs, include NFT-related hashtags and mentions
+- If it's about a specific blockchain, mention that blockchain's official accounts
+- ${tone === 'Degen' ? 'Use appropriate crypto slang like "LFG", "WAGMI", "diamond hands" but keep it authentic' : ''}
+- ${tone === 'Funny' ? 'Add humor that fits crypto Twitter culture and memes' : ''}
 - NO quotes around the reply, write it as a direct tweet
-- Sound like genuine engagement, not corporate speak
+- Sound like genuine crypto Twitter engagement, not corporate speak
+- Make sure to include specific project mentions and tickers when relevant
 
 Reply:`
 }
 
 function generateSimpleFallback(tweetText: string, tone: string): string {
+  // Analyze tweet for crypto keywords to determine appropriate fallback
+  const cryptoKeywords = {
+    bitcoin: { handle: '@bitcoin', ticker: '$BTC', hashtags: '#Bitcoin #BTC' },
+    ethereum: { handle: '@ethereum', ticker: '$ETH', hashtags: '#Ethereum #ETH' },
+    solana: { handle: '@solana', ticker: '$SOL', hashtags: '#Solana #SOL' },
+    defi: { handle: '@DeFi', ticker: '$DeFi', hashtags: '#DeFi #DecentralizedFinance' },
+    nft: { handle: '@NFT', ticker: '$NFT', hashtags: '#NFT #NFTs' }
+  }
+
+  const lowerTweet = tweetText.toLowerCase()
+  let projectMeta = null
+
+  // Detect project from tweet content
+  for (const [keyword, meta] of Object.entries(cryptoKeywords)) {
+    if (lowerTweet.includes(keyword)) {
+      projectMeta = meta
+      break
+    }
+  }
+
   const fallbacks = {
     Smart: [
-      "Interesting perspective! This raises some important points worth considering.",
-      "Great analysis! The data here is quite compelling.",
-      "This aligns with what we've been seeing lately. Good insights!"
+      `Interesting perspective! ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : 'This raises important points worth considering.'}`,
+      `Great analysis! ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : 'The data here is quite compelling.'}`,
+      `This aligns with recent trends. ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : 'Good insights!'}`
     ],
     Funny: [
-      "This is the content I didn't know I needed today! 😂",
-      "Plot twist: this is actually genius!",
-      "My brain after reading this: 🤯 But seriously, great point!"
+      `This is the alpha I didn't know I needed! 😂 ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : ''}`,
+      `Plot twist: this is actually genius! ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : ''}`,
+      `My brain after reading this: 🤯 ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : 'But seriously, great point!'}`
     ],
     Serious: [
-      "This is an important development that deserves attention.",
-      "The implications of this are worth considering carefully.",
-      "This raises critical questions about the current landscape."
+      `This is an important development. ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : 'Deserves careful consideration.'}`,
+      `The implications are significant. ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : 'Worth monitoring closely.'}`,
+      `Critical insights here. ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : 'This changes the landscape.'}`
     ],
     Degen: [
-      "This is the alpha we've been waiting for! 🚀",
-      "LFG! This changes everything!",
-      "Absolutely sending it! This is huge! 💎🙌"
+      `LFG! This is the alpha we've been waiting for! 🚀 ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : '#WAGMI'}`,
+      `Ape mode activated! Time to send it! 🦍💎 ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : '#DiamondHands'}`,
+      `This is it chief! All in! 🚀💎🙌 ${projectMeta ? `${projectMeta.handle} ${projectMeta.ticker} ${projectMeta.hashtags}` : '#ToTheMoon'}`
     ]
   }
 

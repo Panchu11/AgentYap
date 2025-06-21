@@ -5,6 +5,8 @@ class AgentYapInjector {
   private observer: MutationObserver | null = null
   private isContextValid = true
   private injectedContainers = new Set<string>()
+  // HARDCODED: Track all injected containers globally to prevent duplicates
+  private static globalInjectedContainers = new Set<string>()
 
   constructor() {
     this.init()
@@ -105,8 +107,8 @@ class AgentYapInjector {
 
       mutations.forEach((mutation) => {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          // Check for new reply boxes with a slight delay
-          setTimeout(() => this.checkForReplyBoxes(), 300)
+          // HARDCODED: Increased delay to prevent rapid firing
+          setTimeout(() => this.checkForReplyBoxes(), 500)
         }
       })
     })
@@ -121,6 +123,9 @@ class AgentYapInjector {
   }
 
   private checkForReplyBoxes() {
+    // HARDCODED: Remove any duplicate containers first
+    this.removeDuplicateContainers()
+
     // Look for reply textareas/compose boxes with more specific selectors
     const replySelectors = [
       '[data-testid="tweetTextarea_0"]',
@@ -140,16 +145,34 @@ class AgentYapInjector {
     }
   }
 
+  // HARDCODED: Method to remove duplicate containers
+  private removeDuplicateContainers() {
+    const containers = document.querySelectorAll('.agentyap-container')
+    const positions = new Map<string, HTMLElement>()
+
+    containers.forEach(container => {
+      const rect = container.getBoundingClientRect()
+      const positionKey = `${Math.round(rect.top/20)}-${Math.round(rect.left/20)}`
+      
+      if (positions.has(positionKey)) {
+        // Remove duplicate
+        container.remove()
+      } else {
+        positions.set(positionKey, container as HTMLElement)
+      }
+    })
+  }
+
   private maybeInjectAIControls(replyBox: HTMLElement) {
-    // Create unique identifier for this reply box based on its position and content
+    // HARDCODED: Create more specific unique identifier
     const boxId = this.getReplyBoxId(replyBox)
     
-    // Skip if already injected for this specific box
-    if (this.injectedContainers.has(boxId)) {
+    // HARDCODED: Check global set to prevent any duplicates
+    if (AgentYapInjector.globalInjectedContainers.has(boxId)) {
       return
     }
 
-    // Check if there's already a YapMate container near this reply box
+    // HARDCODED: Check if there's already a container near this reply box
     if (this.hasNearbyYapMateContainer(replyBox)) {
       return
     }
@@ -172,20 +195,23 @@ class AgentYapInjector {
     // Inject AI controls
     this.injectAIControls(replyBox, tweetText, boxId)
     this.injectedContainers.add(boxId)
+    // HARDCODED: Add to global set
+    AgentYapInjector.globalInjectedContainers.add(boxId)
   }
 
   private getReplyBoxId(replyBox: HTMLElement): string {
-    // Create a more stable unique ID
+    // HARDCODED: More stable unique ID generation
     const rect = replyBox.getBoundingClientRect()
     const testId = replyBox.getAttribute('data-testid') || ''
     const ariaLabel = replyBox.getAttribute('aria-label') || ''
+    const parentId = replyBox.parentElement?.getAttribute('data-testid') || ''
     
-    // Use a combination of attributes and position for uniqueness
-    return `reply-${testId}-${ariaLabel.slice(0, 10)}-${Math.round(rect.top / 50)}-${Math.round(rect.left / 50)}`
+    // Use a combination of attributes, position, and timestamp for absolute uniqueness
+    return `reply-${testId}-${ariaLabel.slice(0, 5)}-${parentId.slice(0, 5)}-${Math.round(rect.top / 100)}-${Math.round(rect.left / 100)}-${Date.now()}`
   }
 
+  // HARDCODED: Enhanced nearby container detection
   private hasNearbyYapMateContainer(replyBox: HTMLElement): boolean {
-    // Check if there's already a YapMate container within reasonable distance
     const existingContainers = document.querySelectorAll('.agentyap-container')
     const replyRect = replyBox.getBoundingClientRect()
     
@@ -193,8 +219,8 @@ class AgentYapInjector {
       const containerRect = container.getBoundingClientRect()
       const distance = Math.abs(containerRect.top - replyRect.top) + Math.abs(containerRect.left - replyRect.left)
       
-      // If there's a container within 200px, consider it nearby
-      if (distance < 200) {
+      // HARDCODED: Reduced distance threshold for stricter detection
+      if (distance < 100) {
         return true
       }
     }
@@ -256,27 +282,31 @@ class AgentYapInjector {
     const container = document.createElement('div')
     container.className = 'agentyap-container'
     container.dataset.boxId = boxId
+    // HARDCODED: Fixed positioning and size constraints
     container.style.cssText = `
-      margin: 12px 0;
-      padding: 12px;
+      margin: 8px 0;
+      padding: 10px;
       background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-      border-radius: 12px;
+      border-radius: 8px;
       border: 1px solid #e2e8f0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
       position: relative;
       z-index: 1000;
       max-width: 100%;
+      max-height: 200px;
+      overflow: hidden;
+      flex-shrink: 0;
     `
 
     // Create header
     const header = document.createElement('div')
     header.innerHTML = '🤖 <strong>YapMate AI</strong>'
     header.style.cssText = `
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       color: #1e293b;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       display: flex;
       align-items: center;
       gap: 4px;
@@ -298,75 +328,71 @@ class AgentYapInjector {
     container.appendChild(generateButton)
     container.appendChild(rewriteButton)
 
-    // Find the best place to insert the container
+    // HARDCODED: Fixed insertion strategy
     const insertionPoint = this.findInsertionPoint(replyBox)
     if (insertionPoint) {
-      // Insert after the reply box, not inside it
+      // HARDCODED: Always insert after the reply box, never inside
       if (insertionPoint === replyBox.parentElement) {
-        replyBox.parentElement.insertBefore(container, replyBox.nextSibling)
+        insertionPoint.insertBefore(container, replyBox.nextSibling)
       } else {
-        insertionPoint.appendChild(container)
+        // HARDCODED: Create a wrapper to prevent layout issues
+        const wrapper = document.createElement('div')
+        wrapper.style.cssText = `
+          position: relative;
+          z-index: 1000;
+          margin: 8px 0;
+        `
+        wrapper.appendChild(container)
+        insertionPoint.appendChild(wrapper)
       }
     }
   }
 
   private findInsertionPoint(replyBox: HTMLElement): HTMLElement | null {
-    // Strategy 1: Look for the immediate parent that contains the reply box
-    let container = replyBox.parentElement
-    let depth = 0
+    // HARDCODED: Simplified insertion strategy
     
-    while (container && depth < 8) {
-      // Look for containers that seem to be the reply compose area
-      if (
-        container.querySelector('[data-testid="toolBar"]') ||
-        container.querySelector('[data-testid="tweetButton"]') ||
-        container.querySelector('[data-testid="tweetButtonInline"]') ||
-        container.matches('[data-testid*="compose"]') ||
-        container.matches('[data-testid*="reply"]')
-      ) {
-        return container
-      }
-      container = container.parentElement
-      depth++
+    // Strategy 1: Use the immediate parent
+    const immediateParent = replyBox.parentElement
+    if (immediateParent) {
+      return immediateParent
     }
 
-    // Strategy 2: Look for modal dialog containers
-    const modalContainer = replyBox.closest('[role="dialog"]')
-    if (modalContainer) {
-      // Find the content area within the modal
-      const modalContent = modalContainer.querySelector('[data-testid="modal"]') || modalContainer
-      return modalContent as HTMLElement
-    }
-
-    // Strategy 3: Look for form containers
+    // Strategy 2: Look for form containers
     const formContainer = replyBox.closest('form')
     if (formContainer) {
       return formContainer
     }
 
-    // Strategy 4: Use the direct parent
-    return replyBox.parentElement
+    // Strategy 3: Look for modal dialog containers
+    const modalContainer = replyBox.closest('[role="dialog"]')
+    if (modalContainer) {
+      const modalContent = modalContainer.querySelector('[data-testid="modal"]') || modalContainer
+      return modalContent as HTMLElement
+    }
+
+    // Fallback: Use document body (should never happen)
+    return document.body
   }
 
   private createToneSelector(): HTMLElement {
     const container = document.createElement('div')
     container.style.cssText = `
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     `
 
     const label = document.createElement('div')
     label.textContent = '🎯 Tone:'
     label.style.cssText = `
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       color: #374151;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     `
 
     const toneButtons = document.createElement('div')
     toneButtons.style.cssText = `
       display: flex;
-      gap: 6px;
+      gap: 4px;
       flex-wrap: wrap;
     `
 
@@ -383,12 +409,12 @@ class AgentYapInjector {
       button.dataset.tone = tone.value
       button.innerHTML = `${tone.emoji} ${tone.label}`
       button.style.cssText = `
-        padding: 6px 10px;
+        padding: 4px 8px;
         border: 1px solid ${index === 0 ? '#1da1f2' : '#d1d5db'};
-        border-radius: 16px;
+        border-radius: 12px;
         background: ${index === 0 ? '#1da1f2' : 'white'};
         color: ${index === 0 ? 'white' : '#374151'};
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 500;
         cursor: pointer;
         transition: all 0.2s ease;
@@ -436,16 +462,16 @@ class AgentYapInjector {
     button.innerHTML = '✨ Generate AI Reply'
     button.style.cssText = `
       width: 100%;
-      padding: 10px 16px;
+      padding: 8px 12px;
       background: linear-gradient(135deg, #1da1f2, #0d8bd9);
       color: white;
       border: none;
-      border-radius: 8px;
-      font-size: 13px;
+      border-radius: 6px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     `
 
     button.addEventListener('mouseenter', () => {
@@ -532,12 +558,12 @@ class AgentYapInjector {
     button.innerHTML = '🔄 Rewrite Reply'
     button.style.cssText = `
       width: 100%;
-      padding: 8px 16px;
+      padding: 6px 12px;
       background: #6b7280;
       color: white;
       border: none;
-      border-radius: 8px;
-      font-size: 12px;
+      border-radius: 6px;
+      font-size: 11px;
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s ease;
@@ -667,6 +693,7 @@ class AgentYapInjector {
     return null
   }
 
+  // HARDCODED: Simplified reply box filling to prevent layout issues
   private async fillReplyBoxEnhanced(replyBox: HTMLElement, text: string): Promise<void> {
     console.log('Filling reply box with enhanced method:', text)
     
@@ -682,7 +709,7 @@ class AgentYapInjector {
       replyBox.innerHTML = ''
     }
 
-    // Step 2: Set content using multiple methods
+    // Step 2: Set content directly
     if (replyBox.tagName === 'TEXTAREA' || replyBox.tagName === 'INPUT') {
       (replyBox as HTMLInputElement).value = text
     } else {
@@ -690,80 +717,15 @@ class AgentYapInjector {
       replyBox.innerHTML = text
     }
 
-    // Step 3: Simulate realistic typing to trigger all React events
-    await this.simulateTypingSequence(replyBox, text)
-
-    // Step 4: Trigger comprehensive event sequence
-    await this.triggerComprehensiveEvents(replyBox, text)
-
-    // Step 5: Force Twitter to recognize the content
-    await this.forceTwitterRecognition(replyBox, text)
-
-    console.log('Reply box filled successfully')
-  }
-
-  private async simulateTypingSequence(replyBox: HTMLElement, text: string): Promise<void> {
-    // Clear first
-    if (replyBox.tagName === 'TEXTAREA' || replyBox.tagName === 'INPUT') {
-      (replyBox as HTMLInputElement).value = ''
-    } else {
-      replyBox.textContent = ''
-      replyBox.innerHTML = ''
-    }
-
-    // Type character by character
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i]
-      
-      // Update content
-      if (replyBox.tagName === 'TEXTAREA' || replyBox.tagName === 'INPUT') {
-        (replyBox as HTMLInputElement).value += char
-      } else {
-        replyBox.textContent += char
-        replyBox.innerHTML = replyBox.textContent || ''
-      }
-
-      // Dispatch input event for each character
-      const inputEvent = new InputEvent('input', {
-        bubbles: true,
-        inputType: 'insertText',
-        data: char
-      })
-      replyBox.dispatchEvent(inputEvent)
-
-      // Add small delay every few characters
-      if (i % 5 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 20))
-      }
-    }
-  }
-
-  private async triggerComprehensiveEvents(replyBox: HTMLElement, text: string): Promise<void> {
+    // Step 3: Trigger essential events only
     const events = [
-      // Basic events
       new Event('focus', { bubbles: true }),
-      new Event('input', { bubbles: true }),
       new InputEvent('input', { 
         bubbles: true, 
         inputType: 'insertText',
         data: text
       }),
       new Event('change', { bubbles: true }),
-      
-      // Keyboard events
-      new KeyboardEvent('keydown', { bubbles: true, key: 'a' }),
-      new KeyboardEvent('keyup', { bubbles: true, key: 'a' }),
-      new KeyboardEvent('keypress', { bubbles: true, key: 'a' }),
-      
-      // Composition events
-      new Event('compositionstart', { bubbles: true }),
-      new Event('compositionend', { bubbles: true }),
-      
-      // Other events
-      new Event('paste', { bubbles: true }),
-      new Event('textInput', { bubbles: true }),
-      
-      // Space key to trigger character count
       new KeyboardEvent('keydown', { bubbles: true, key: ' ', code: 'Space' }),
       new KeyboardEvent('keyup', { bubbles: true, key: ' ', code: 'Space' })
     ]
@@ -776,64 +738,10 @@ class AgentYapInjector {
         console.warn('Could not dispatch event:', e)
       }
     }
-  }
 
-  private async forceTwitterRecognition(replyBox: HTMLElement, text: string): Promise<void> {
-    // Method 1: Trigger React's internal state update
-    const reactKey = Object.keys(replyBox).find(key => key.startsWith('__reactInternalInstance') || key.startsWith('__reactFiber'))
-    if (reactKey) {
-      try {
-        const reactInstance = (replyBox as any)[reactKey]
-        if (reactInstance && reactInstance.memoizedProps && reactInstance.memoizedProps.onChange) {
-          reactInstance.memoizedProps.onChange({
-            target: { value: text }
-          })
-        }
-      } catch (e) {
-        console.warn('Could not trigger React state update:', e)
-      }
-    }
-
-    // Method 2: Simulate user interaction pattern
+    // Step 4: Final focus
     replyBox.focus()
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // Simulate a space key press to trigger character counting
-    const spaceDown = new KeyboardEvent('keydown', {
-      bubbles: true,
-      key: ' ',
-      code: 'Space',
-      keyCode: 32,
-      which: 32
-    })
-    const spaceUp = new KeyboardEvent('keyup', {
-      bubbles: true,
-      key: ' ',
-      code: 'Space',
-      keyCode: 32,
-      which: 32
-    })
-    
-    replyBox.dispatchEvent(spaceDown)
-    await new Promise(resolve => setTimeout(resolve, 50))
-    replyBox.dispatchEvent(spaceUp)
-
-    // Method 3: Final input event with full text
-    const finalInputEvent = new InputEvent('input', {
-      bubbles: true,
-      inputType: 'insertText',
-      data: text
-    })
-    replyBox.dispatchEvent(finalInputEvent)
-
-    // Method 4: Blur and refocus to trigger validation
-    replyBox.blur()
-    await new Promise(resolve => setTimeout(resolve, 100))
-    replyBox.focus()
-
-    // Method 5: Trigger change event
-    const changeEvent = new Event('change', { bubbles: true })
-    replyBox.dispatchEvent(changeEvent)
+    console.log('Reply box filled successfully')
   }
 
   public destroy() {
@@ -846,6 +754,8 @@ class AgentYapInjector {
     // Remove all injected controls
     document.querySelectorAll('.agentyap-container').forEach(container => container.remove())
     this.injectedContainers.clear()
+    // HARDCODED: Clear global set
+    AgentYapInjector.globalInjectedContainers.clear()
   }
 }
 
