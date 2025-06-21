@@ -18,7 +18,7 @@ class AgentYapInjector {
     }
 
     // Listen for messages from popup
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       this.handleMessage(message, sendResponse)
     })
   }
@@ -36,7 +36,8 @@ class AgentYapInjector {
           sendResponse({ success: true, reply })
         } catch (error) {
           console.error('Error generating reply:', error)
-          sendResponse({ success: false, error: error.message })
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+          sendResponse({ success: false, error: errorMessage })
         }
         break
 
@@ -50,7 +51,8 @@ class AgentYapInjector {
           sendResponse({ success: true, reply: newReply })
         } catch (error) {
           console.error('Error rewriting reply:', error)
-          sendResponse({ success: false, error: error.message })
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+          sendResponse({ success: false, error: errorMessage })
         }
         break
     }
