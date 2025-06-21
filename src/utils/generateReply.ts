@@ -3,9 +3,12 @@ import { openRouterAPI } from '../api/openrouter'
 import { getFallbackReply } from '../mock/fallbackReplies'
 
 export async function generateReply(tweetText: string, tone: string): Promise<string> {
+  // Declare projectMeta outside try block so it's accessible in catch
+  let projectMeta: any
+  
   try {
     // Detect project metadata from tweet
-    const projectMeta = getProjectMeta(tweetText)
+    projectMeta = getProjectMeta(tweetText)
     
     // Build the prompt
     const prompt = buildPrompt(tweetText, tone, projectMeta)
@@ -21,7 +24,7 @@ export async function generateReply(tweetText: string, tone: string): Promise<st
     }
   } catch (error) {
     console.error('Error in generateReply:', error)
-    // Ultimate fallback
+    // Ultimate fallback - projectMeta is now accessible here
     return `Great point! ${projectMeta?.handle ? `@${projectMeta.handle}` : ''} ${projectMeta?.ticker ? `$${projectMeta.ticker}` : ''} ${projectMeta?.hashtags?.[0] || '#crypto'}`
   }
 }
