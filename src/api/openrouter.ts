@@ -1,19 +1,24 @@
-const API_KEY = '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'
-const MODEL_ID = 'google/gemini-2.0-flash-exp:free'
-const API_URL = 'https://openrouter.ai/api/v1/chat/completions'
-
+// Remove hardcoded API key and use storage
 export async function openRouterAPI(prompt: string): Promise<string> {
   try {
-    const response = await fetch(API_URL, {
+    // Get API key from Chrome storage
+    const result = await chrome.storage.sync.get(['openrouterApiKey'])
+    const apiKey = result.openrouterApiKey
+    
+    if (!apiKey) {
+      throw new Error('API key not configured. Please set it in extension settings.')
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://github.com/Panchu11/AgentYap',
         'X-Title': 'AgentYap Chrome Extension'
       },
       body: JSON.stringify({
-        model: MODEL_ID,
+        model: 'google/gemini-2.0-flash-exp:free',
         messages: [
           {
             role: 'system',
@@ -41,8 +46,6 @@ export async function openRouterAPI(prompt: string): Promise<string> {
     }
 
     const reply = data.choices[0].message.content.trim()
-    
-    // Clean up the reply (remove "Reply:" prefix if present)
     return reply.replace(/^(Reply:|Response:)\s*/i, '').trim()
     
   } catch (error) {
