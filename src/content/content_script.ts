@@ -556,13 +556,17 @@ class AgentYapInjector {
       
       const replyRect = replyBox.getBoundingClientRect()
       
-      allTweetTexts.forEach(tweetElement => {
-        const tweetRect = tweetElement.getBoundingClientRect()
-        const distance = Math.abs(tweetRect.bottom - replyRect.top)
-        
-        if (distance < closestDistance && tweetRect.top < replyRect.top) {
-          closestDistance = distance
-          closestTweet = tweetElement as HTMLElement
+      // Convert NodeList to Array and iterate with proper typing
+      Array.from(allTweetTexts).forEach(tweetElement => {
+        // Type check to ensure it's an HTMLElement
+        if (tweetElement instanceof HTMLElement) {
+          const tweetRect = tweetElement.getBoundingClientRect()
+          const distance = Math.abs(tweetRect.bottom - replyRect.top)
+          
+          if (distance < closestDistance && tweetRect.top < replyRect.top) {
+            closestDistance = distance
+            closestTweet = tweetElement
+          }
         }
       })
       
