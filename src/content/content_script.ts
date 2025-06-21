@@ -249,8 +249,8 @@ class AgentYapInjector {
         // Generate the reply
         const reply = await generateReply(tweetText, 'Smart') // Default to Smart tone
         
-        // Find and fill the reply textarea with multiple methods
-        await this.fillReplyBox(reply)
+        // Find and fill the reply textarea with enhanced method
+        await this.fillReplyBoxAdvanced(reply)
         
         // Success feedback
         button.style.background = '#10B981'
@@ -300,7 +300,7 @@ class AgentYapInjector {
       '[contenteditable="true"]'
     ]
 
-    for (let attempt = 0; attempt < 15; attempt++) {
+    for (let attempt = 0; attempt < 20; attempt++) {
       for (const selector of selectors) {
         const element = document.querySelector(selector)
         if (element) {
@@ -314,7 +314,7 @@ class AgentYapInjector {
     throw new Error('Could not find reply textarea after multiple attempts')
   }
 
-  private async fillReplyBox(reply: string): Promise<void> {
+  private async fillReplyBoxAdvanced(reply: string): Promise<void> {
     const selectors = [
       '[data-testid="tweetTextarea_0"]',
       '[role="textbox"]',
@@ -329,51 +329,20 @@ class AgentYapInjector {
       const element = document.querySelector(selector) as HTMLElement
       if (element) {
         try {
-          // Focus the element first
-          element.focus()
+          console.log(`Attempting to fill element with selector: ${selector}`)
           
-          // Clear existing content
-          if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
-            (element as HTMLInputElement).value = ''
-          } else {
-            element.textContent = ''
-            element.innerHTML = ''
-          }
-
-          // Set the new content
-          if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
-            (element as HTMLInputElement).value = reply
-          } else {
-            element.textContent = reply
-            element.innerHTML = reply
-          }
-
-          // Trigger comprehensive events to notify Twitter
-          const events = [
-            new Event('focus', { bubbles: true }),
-            new Event('input', { bubbles: true }),
-            new Event('change', { bubbles: true }),
-            new KeyboardEvent('keydown', { bubbles: true, key: 'a' }),
-            new KeyboardEvent('keyup', { bubbles: true, key: 'a' }),
-            new Event('blur', { bubbles: true }),
-            new Event('paste', { bubbles: true }),
-            // Additional events for Twitter's React components
-            new InputEvent('input', { bubbles: true, inputType: 'insertText', data: reply }),
-            new Event('compositionend', { bubbles: true }),
-            new KeyboardEvent('keypress', { bubbles: true, key: 'Enter' }),
-          ]
-
-          events.forEach(event => {
-            try {
-              element.dispatchEvent(event)
-            } catch (e) {
-              console.warn('Could not dispatch event:', e)
-            }
-          })
-
-          // Additional step: simulate typing to trigger React state updates
-          await this.simulateTyping(element, reply)
-
+          // Method 1: Direct content setting with comprehensive events
+          await this.setElementContent(element, reply)
+          
+          // Method 2: Simulate realistic typing
+          await this.simulateRealisticTyping(element, reply)
+          
+          // Method 3: Force React state update
+          await this.forceReactUpdate(element)
+          
+          // Method 4: Trigger Twitter-specific events
+          await this.triggerTwitterEvents(element)
+          
           console.log(`Successfully filled reply box using selector: ${selector}`)
           filled = true
           break
@@ -388,7 +357,45 @@ class AgentYapInjector {
     }
   }
 
-  private async simulateTyping(element: HTMLElement, text: string): Promise<void> {
+  private async setElementContent(element: HTMLElement, text: string): Promise<void> {
+    // Focus first
+    element.focus()
+    
+    // Clear existing content
+    if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+      (element as HTMLInputElement).value = ''
+    } else {
+      element.textContent = ''
+      element.innerHTML = ''
+    }
+
+    // Set the new content
+    if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+      (element as HTMLInputElement).value = text
+    } else {
+      element.textContent = text
+      element.innerHTML = text
+    }
+
+    // Dispatch basic events
+    const events = [
+      new Event('focus', { bubbles: true }),
+      new Event('input', { bubbles: true }),
+      new Event('change', { bubbles: true }),
+      new KeyboardEvent('keydown', { bubbles: true, key: 'a' }),
+      new KeyboardEvent('keyup', { bubbles: true, key: 'a' }),
+    ]
+
+    events.forEach(event => {
+      try {
+        element.dispatchEvent(event)
+      } catch (e) {
+        console.warn('Could not dispatch basic event:', e)
+      }
+    })
+  }
+
+  private async simulateRealisticTyping(element: HTMLElement, text: string): Promise<void> {
     // Clear the element first
     if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
       (element as HTMLInputElement).value = ''
@@ -397,14 +404,13 @@ class AgentYapInjector {
       element.innerHTML = ''
     }
 
-    // Focus the element
     element.focus()
 
-    // Simulate typing character by character
+    // Type character by character with realistic timing
     for (let i = 0; i < text.length; i++) {
       const char = text[i]
       
-      // Update the content
+      // Update content
       if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
         (element as HTMLInputElement).value += char
       } else {
@@ -420,28 +426,71 @@ class AgentYapInjector {
       })
       element.dispatchEvent(inputEvent)
 
-      // Small delay to make it more realistic
-      if (i % 10 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 10))
+      // Add realistic delays
+      if (i % 5 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 20))
       }
     }
+  }
 
-    // Final events to ensure Twitter recognizes the content
-    const finalEvents = [
-      new Event('input', { bubbles: true }),
+  private async forceReactUpdate(element: HTMLElement): Promise<void> {
+    // Try to trigger React's internal state updates
+    const reactEvents = [
+      new InputEvent('input', { 
+        bubbles: true, 
+        inputType: 'insertText',
+        data: element.tagName === 'TEXTAREA' || element.tagName === 'INPUT' 
+          ? (element as HTMLInputElement).value 
+          : element.textContent || ''
+      }),
       new Event('change', { bubbles: true }),
-      new KeyboardEvent('keyup', { bubbles: true, key: 'a' }),
+      new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }),
+      new KeyboardEvent('keyup', { bubbles: true, key: 'Enter' }),
       new Event('blur', { bubbles: true }),
       new Event('focus', { bubbles: true })
     ]
 
-    finalEvents.forEach(event => {
+    for (const event of reactEvents) {
       try {
         element.dispatchEvent(event)
+        await new Promise(resolve => setTimeout(resolve, 10))
       } catch (e) {
-        console.warn('Could not dispatch final event:', e)
+        console.warn('Could not dispatch React event:', e)
       }
+    }
+  }
+
+  private async triggerTwitterEvents(element: HTMLElement): Promise<void> {
+    // Twitter-specific event patterns
+    const twitterEvents = [
+      new Event('compositionstart', { bubbles: true }),
+      new Event('compositionend', { bubbles: true }),
+      new KeyboardEvent('keypress', { bubbles: true, key: 'a' }),
+      new Event('paste', { bubbles: true }),
+      new Event('textInput', { bubbles: true })
+    ]
+
+    for (const event of twitterEvents) {
+      try {
+        element.dispatchEvent(event)
+        await new Promise(resolve => setTimeout(resolve, 10))
+      } catch (e) {
+        console.warn('Could not dispatch Twitter event:', e)
+      }
+    }
+
+    // Final focus to ensure Twitter recognizes the content
+    element.focus()
+    
+    // Trigger a final comprehensive update
+    const finalEvent = new InputEvent('input', {
+      bubbles: true,
+      inputType: 'insertText',
+      data: element.tagName === 'TEXTAREA' || element.tagName === 'INPUT' 
+        ? (element as HTMLInputElement).value 
+        : element.textContent || ''
     })
+    element.dispatchEvent(finalEvent)
   }
 
   private addRewriteButton(originalButton: HTMLElement, currentReply: string) {
@@ -487,8 +536,8 @@ class AgentYapInjector {
       try {
         const newReply = await rewriteReply(currentReply)
         
-        // Fill the reply box with the new reply
-        await this.fillReplyBox(newReply)
+        // Fill the reply box with the new reply using advanced method
+        await this.fillReplyBoxAdvanced(newReply)
         
         rewriteButton.innerHTML = '✅ Rewritten!'
         
