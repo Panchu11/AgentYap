@@ -1,4 +1,4 @@
-# 💬 AgentYap
+# 💬 YapMate
 
 AI-powered Twitter reply generator for crypto Twitter. Generate authentic, engaging replies with the perfect tone and project mentions.
 
@@ -26,7 +26,7 @@ AI-powered Twitter reply generator for crypto Twitter. Generate authentic, engag
 
 ## 🔧 Configuration
 
-1. Click the AgentYap extension icon
+1. Click the YapMate extension icon
 2. Go to Settings (⚙️)
 3. Enter your OpenRouter API key
 4. Save and start using!
@@ -58,5 +58,5 @@ MIT License - see LICENSE file for details
 
 ## 🆘 Support
 
-- GitHub Issues: [Report bugs](https://github.com/Panchu11/AgentYap/issues)
-- Email: support@agentyap.com
+- GitHub Issues: [Report bugs](https://github.com/YapMate/YapMate/issues)
+- Email: support@yapmate.com

@@ -1,10 +1,10 @@
-# Privacy Policy for AgentYap
+# Privacy Policy for YapMate
 
-Last updated: [Date]
+Last updated: May 15, 2025
 
 ## Information We Collect
 
-AgentYap is a Chrome extension that helps generate AI-powered replies for Twitter. We collect minimal information:
+YapMate is a Chrome extension that helps generate AI-powered replies for Twitter. We collect minimal information:
 
 ### Data We Store Locally
 - Your OpenRouter API key (stored in Chrome's local storage)
@@ -47,7 +47,7 @@ AgentYap is a Chrome extension that helps generate AI-powered replies for Twitte
 
 ## Contact
 
-For privacy questions: privacy@agentyap.com
+For privacy questions: privacy@yapmate.com
 
 ## Changes
 

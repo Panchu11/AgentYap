@@ -1,7 +1,7 @@
-# AgentYap - Chrome Web Store Listing
+# YapMate - Chrome Web Store Listing
 
 ## Title
-AgentYap - AI Twitter Reply Generator
+YapMate - AI Twitter Reply Generator
 
 ## Short Description
 Generate authentic crypto Twitter replies with AI. Choose your tone, get perfect responses with handles, tickers, and hashtags.
@@ -9,7 +9,7 @@ Generate authentic crypto Twitter replies with AI. Choose your tone, get perfect
 ## Detailed Description
 🚀 **Transform Your Twitter Engagement with AI-Powered Replies**
 
-AgentYap is the ultimate Chrome extension for crypto Twitter enthusiasts who want to engage authentically and efficiently. Generate perfect replies that sound natural, include relevant project mentions, and match your desired tone.
+YapMate is the ultimate Chrome extension for crypto Twitter enthusiasts who want to engage authentically and efficiently. Generate perfect replies that sound natural, include relevant project mentions, and match your desired tone.
 
 **✨ Key Features:**
 • **4 Tone Options**: Smart, Funny, Serious, or Degen - match any conversation style
@@ -48,7 +48,7 @@ AgentYap is the ultimate Chrome extension for crypto Twitter enthusiasts who wan
 2. Configure in extension settings
 3. Start generating amazing replies!
 
-Join thousands of users already boosting their Twitter engagement with AgentYap!
+Join thousands of users already boosting their Twitter engagement with YapMate!
 
 ## Category
 Productivity
@@ -64,7 +64,7 @@ Productivity
 twitter, crypto, ai, replies, social media, engagement, automation, productivity, chrome extension, openrouter
 
 ## Privacy Policy URL
-https://github.com/Panchu11/AgentYap/blob/main/privacy-policy.md
+https://github.com/YapMate/YapMate/blob/main/privacy-policy.md
 
 ## Support URL
-https://github.com/Panchu11/AgentYap/issues
+https://github.com/YapMate/YapMate/issues

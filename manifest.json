@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AgentYap",
+  "name": "YapMate",
   "version": "1.0.0",
   "description": "AI-powered Twitter reply generator for crypto Twitter",
   "permissions": [
@@ -22,7 +22,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "AgentYap"
+    "default_title": "YapMate"
   },
   "icons": {
     "16": "icons/icon16.png",
