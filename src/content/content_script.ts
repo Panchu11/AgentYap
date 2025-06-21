@@ -551,7 +551,7 @@ class AgentYapInjector {
     const allTweetTexts = document.querySelectorAll('[data-testid="tweetText"]')
     if (allTweetTexts.length > 0) {
       // Find the tweet text that's closest to our reply box
-      let closestTweet = null
+      let closestTweet: Element | null = null
       let closestDistance = Infinity
       
       const replyRect = replyBox.getBoundingClientRect()
