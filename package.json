@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "build:extension": "npm run build && npm run copy:manifest",
-    "copy:manifest": "cp manifest.json dist/"
+    "build:extension": "npm run build && npm run copy:files",
+    "copy:files": "cp manifest.json dist/ && cp -r dist/icons dist/ 2>/dev/null || true"
   },
   "dependencies": {
     "react": "^18.3.1",
