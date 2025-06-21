@@ -4,12 +4,19 @@ import { rewriteReply } from '../utils/rewriteReply'
 class AgentYapInjector {
   private observer: MutationObserver | null = null
   private injectedButtons = new Set<string>()
+  private isContextValid = true
 
   constructor() {
     this.init()
   }
 
   private init() {
+    // Check if extension context is valid
+    if (!chrome?.runtime?.id) {
+      console.warn('Extension context invalid, stopping initialization')
+      return
+    }
+
     // Wait for page to load
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => this.startObserving())
@@ -17,25 +24,42 @@ class AgentYapInjector {
       this.startObserving()
     }
 
-    // Listen for messages from popup - with proper error handling
+    // Listen for messages from popup with enhanced error handling
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       this.handleMessage(message, sendResponse)
       return true // Keep message channel open for async response
     })
+
+    // Listen for extension context invalidation
+    chrome.runtime.onConnect.addListener(() => {
+      // Connection established, context is valid
+      this.isContextValid = true
+    })
   }
 
   private async handleMessage(message: any, sendResponse: (response?: any) => void) {
+    // Check context validity
+    if (!this.isContextValid || !chrome?.runtime?.id) {
+      sendResponse({ 
+        success: false, 
+        error: 'Extension context invalidated. Please refresh the page.' 
+      })
+      return
+    }
+
     try {
       switch (message.type) {
         case 'GENERATE_REPLY':
           try {
             const reply = await generateReply(message.tweetText, message.tone)
-            // Send reply back to popup
+            // Send reply back to popup with context check
             try {
-              chrome.runtime.sendMessage({
-                type: 'REPLY_GENERATED',
-                reply: reply
-              })
+              if (chrome?.runtime?.id) {
+                chrome.runtime.sendMessage({
+                  type: 'REPLY_GENERATED',
+                  reply: reply
+                })
+              }
             } catch (e) {
               console.warn('Could not send message to popup:', e)
             }
@@ -51,10 +75,12 @@ class AgentYapInjector {
           try {
             const newReply = await rewriteReply(message.originalReply)
             try {
-              chrome.runtime.sendMessage({
-                type: 'REPLY_GENERATED',
-                reply: newReply
-              })
+              if (chrome?.runtime?.id) {
+                chrome.runtime.sendMessage({
+                  type: 'REPLY_GENERATED',
+                  reply: newReply
+                })
+              }
             } catch (e) {
               console.warn('Could not send message to popup:', e)
             }
@@ -73,10 +99,14 @@ class AgentYapInjector {
   }
 
   private startObserving() {
+    if (!this.isContextValid) return
+
     this.injectButtons()
     
     // Set up mutation observer for infinite scroll
     this.observer = new MutationObserver((mutations) => {
+      if (!this.isContextValid) return
+
       let shouldInject = false
       
       mutations.forEach((mutation) => {
@@ -97,6 +127,8 @@ class AgentYapInjector {
   }
 
   private injectButtons() {
+    if (!this.isContextValid) return
+
     // Find all tweet articles
     const tweets = document.querySelectorAll('article[data-testid="tweet"]')
     
@@ -188,6 +220,17 @@ class AgentYapInjector {
       e.preventDefault()
       e.stopPropagation()
       
+      // Check context validity before proceeding
+      if (!this.isContextValid || !chrome?.runtime?.id) {
+        button.style.background = '#EF4444'
+        button.innerHTML = '❌ Extension Error'
+        setTimeout(() => {
+          button.style.background = 'linear-gradient(135deg, #1DA1F2, #0d8bd9)'
+          button.innerHTML = '💬 Reply with AI'
+        }, 3000)
+        return
+      }
+      
       // Show loading state
       button.style.background = '#0d8bd9'
       button.innerHTML = '⏳ Generating...'
@@ -220,13 +263,27 @@ class AgentYapInjector {
       } catch (error) {
         console.error('Error generating reply:', error)
         button.style.background = '#EF4444'
-        button.innerHTML = '❌ Error'
+        
+        // Show specific error message
+        if (error instanceof Error) {
+          if (error.message.includes('Extension context invalidated') || 
+              error.message.includes('Extension was reloaded')) {
+            button.innerHTML = '🔄 Refresh Page'
+          } else if (error.message.includes('API key')) {
+            button.innerHTML = '🔑 Check API Key'
+          } else {
+            button.innerHTML = '❌ Error'
+          }
+        } else {
+          button.innerHTML = '❌ Error'
+        }
+        
         button.disabled = false
         
         setTimeout(() => {
           button.style.background = 'linear-gradient(135deg, #1DA1F2, #0d8bd9)'
           button.innerHTML = '💬 Reply with AI'
-        }, 3000)
+        }, 5000)
       }
     })
 
@@ -243,7 +300,7 @@ class AgentYapInjector {
       '[contenteditable="true"]'
     ]
 
-    for (let attempt = 0; attempt < 10; attempt++) {
+    for (let attempt = 0; attempt < 15; attempt++) {
       for (const selector of selectors) {
         const element = document.querySelector(selector)
         if (element) {
@@ -251,7 +308,7 @@ class AgentYapInjector {
           return
         }
       }
-      await new Promise(resolve => setTimeout(resolve, 300))
+      await new Promise(resolve => setTimeout(resolve, 200))
     }
     
     throw new Error('Could not find reply textarea after multiple attempts')
@@ -291,14 +348,15 @@ class AgentYapInjector {
             element.innerHTML = reply
           }
 
-          // Trigger events to notify Twitter
+          // Trigger comprehensive events to notify Twitter
           const events = [
             new Event('focus', { bubbles: true }),
             new Event('input', { bubbles: true }),
             new Event('change', { bubbles: true }),
             new KeyboardEvent('keydown', { bubbles: true, key: 'a' }),
             new KeyboardEvent('keyup', { bubbles: true, key: 'a' }),
-            new Event('blur', { bubbles: true })
+            new Event('blur', { bubbles: true }),
+            new Event('paste', { bubbles: true })
           ]
 
           events.forEach(event => {
@@ -354,6 +412,12 @@ class AgentYapInjector {
       e.preventDefault()
       e.stopPropagation()
       
+      // Check context validity
+      if (!this.isContextValid || !chrome?.runtime?.id) {
+        rewriteButton.innerHTML = '🔄 Refresh Page'
+        return
+      }
+      
       rewriteButton.innerHTML = '⏳ Rewriting...'
       rewriteButton.disabled = true
       
@@ -388,6 +452,8 @@ class AgentYapInjector {
   }
 
   public destroy() {
+    this.isContextValid = false
+    
     if (this.observer) {
       this.observer.disconnect()
     }
@@ -398,10 +464,19 @@ class AgentYapInjector {
   }
 }
 
-// Initialize the injector
-const injector = new AgentYapInjector()
+// Initialize the injector with context check
+if (chrome?.runtime?.id) {
+  const injector = new AgentYapInjector()
 
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-  injector.destroy()
-})
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    injector.destroy()
+  })
+
+  // Handle extension context invalidation
+  chrome.runtime.onConnect.addListener(() => {
+    console.log('Extension context restored')
+  })
+} else {
+  console.warn('Extension context not available, skipping initialization')
+}
