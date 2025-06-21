@@ -1,61 +1,35 @@
 interface ProjectMeta {
-  handle: string
-  ticker: string
+  handle: string | null
+  ticker: string | null
   hashtags: string[]
 }
 
 const PROJECT_MAPPING: Record<string, ProjectMeta> = {
-  // Existing crypto projects
-  'kaito': {
-    handle: 'Kaito',
-    ticker: 'KAITO',
-    hashtags: ['#KaitoYap', '#AIAlpha', '#CTTools']
+  // Major crypto projects with official handles and tickers
+  'humanity protocol': {
+    handle: 'TK_Humanity',
+    ticker: 'HMT',
+    hashtags: ['#HumanityProtocol', '#HumanityTestnet', '#PalmScan']
   },
-  'creatorbid': {
-    handle: 'CreatorBid',
-    ticker: 'BID',
-    hashtags: ['#CreatorBid', '#BidVerse', '#SniperAI']
-  },
-  'solana': {
-    handle: 'solana',
-    ticker: 'SOL',
-    hashtags: ['#Solana', '#SOL', '#SolanaEcosystem']
-  },
-  'ethereum': {
-    handle: 'ethereum',
-    ticker: 'ETH',
-    hashtags: ['#Ethereum', '#ETH', '#DeFi']
+  'humanity': {
+    handle: 'TK_Humanity',
+    ticker: 'HMT',
+    hashtags: ['#HumanityProtocol', '#HumanityTestnet', '#PalmScan']
   },
   'bitcoin': {
     handle: 'bitcoin',
     ticker: 'BTC',
     hashtags: ['#Bitcoin', '#BTC', '#HODL']
   },
-  'ai': {
-    handle: 'AI',
-    ticker: 'AI',
-    hashtags: ['#AI', '#ArtificialIntelligence', '#MachineLearning']
+  'ethereum': {
+    handle: 'ethereum',
+    ticker: 'ETH',
+    hashtags: ['#Ethereum', '#ETH', '#DeFi']
   },
-  'defi': {
-    handle: 'DeFi',
-    ticker: 'DEFI',
-    hashtags: ['#DeFi', '#DecentralizedFinance', '#Yield']
-  },
-  'nft': {
-    handle: 'NFT',
-    ticker: 'NFT',
-    hashtags: ['#NFT', '#NFTs', '#DigitalArt']
-  },
-  // Add specific projects that are commonly mentioned
-  'humanity protocol': {
-    handle: 'TK_Humanity',
-    ticker: 'H',
-    hashtags: ['#HumanityProtocol', '#HumanityTestnet', '#PalmScan']
-  },
-  'humanity': {
-    handle: 'TK_Humanity',
-    ticker: 'H',
-    hashtags: ['#HumanityProtocol', '#HumanityTestnet', '#PalmScan']
+  'solana': {
+    handle: 'solana',
+    ticker: 'SOL',
+    hashtags: ['#Solana', '#SOL', '#SolanaEcosystem']
   },
   'base': {
     handle: 'base',
@@ -104,12 +78,12 @@ const PROJECT_MAPPING: Record<string, ProjectMeta> = {
   },
   'opensea': {
     handle: 'opensea',
-    ticker: 'NFT',
+    ticker: null,
     hashtags: ['#OpenSea', '#NFT', '#NFTMarketplace']
   },
   'metamask': {
     handle: 'MetaMask',
-    ticker: 'ETH',
+    ticker: null,
     hashtags: ['#MetaMask', '#Web3Wallet', '#Ethereum']
   },
   'binance': {
@@ -121,6 +95,16 @@ const PROJECT_MAPPING: Record<string, ProjectMeta> = {
     handle: 'coinbase',
     ticker: 'COIN',
     hashtags: ['#Coinbase', '#COIN', '#Crypto']
+  },
+  'xeet': {
+    handle: 'xeetdotai',
+    ticker: 'XEET',
+    hashtags: ['#XeetAi', '#InfoFi', '#DeFi']
+  },
+  'xeetdotai': {
+    handle: 'xeetdotai',
+    ticker: 'XEET',
+    hashtags: ['#XeetAi', '#InfoFi', '#DeFi']
   }
 }
 
@@ -128,6 +112,7 @@ const PROJECT_MAPPING: Record<string, ProjectMeta> = {
 const DETECTION_PATTERNS = [
   // Multi-word project names
   { pattern: /humanity\s+protocol/i, key: 'humanity protocol' },
+  { pattern: /xeet\.ai|xeetdotai/i, key: 'xeetdotai' },
   { pattern: /magic\s+eden/i, key: 'magic eden' },
   { pattern: /pancake\s+swap/i, key: 'pancakeswap' },
   { pattern: /sushi\s+swap/i, key: 'sushiswap' },
@@ -137,11 +122,10 @@ const DETECTION_PATTERNS = [
   { pattern: /compound\s+finance/i, key: 'compound' },
   // Single word patterns
   { pattern: /\bhumanity\b/i, key: 'humanity' },
-  { pattern: /\bkaito\b/i, key: 'kaito' },
-  { pattern: /\bcreatorbid\b/i, key: 'creatorbid' },
-  { pattern: /\bsolana\b/i, key: 'solana' },
-  { pattern: /\bethereum\b/i, key: 'ethereum' },
+  { pattern: /\bxeet\b/i, key: 'xeet' },
   { pattern: /\bbitcoin\b/i, key: 'bitcoin' },
+  { pattern: /\bethereum\b/i, key: 'ethereum' },
+  { pattern: /\bsolana\b/i, key: 'solana' },
   { pattern: /\bbase\b/i, key: 'base' },
   { pattern: /\barbitrum\b/i, key: 'arbitrum' },
   { pattern: /\bpolygon\b/i, key: 'polygon' },
@@ -179,7 +163,7 @@ export function getProjectMeta(tweetText: string): ProjectMeta {
       
       // Direct handle match
       for (const [key, meta] of Object.entries(PROJECT_MAPPING)) {
-        if (meta.handle.toLowerCase() === handle) {
+        if (meta.handle && meta.handle.toLowerCase() === handle) {
           console.log(`Detected project by handle: ${key}`, meta)
           return meta
         }
@@ -187,7 +171,7 @@ export function getProjectMeta(tweetText: string): ProjectMeta {
       
       // Partial handle match (for handles like TK_Humanity)
       for (const [key, meta] of Object.entries(PROJECT_MAPPING)) {
-        if (meta.handle.toLowerCase().includes(handle) || handle.includes(meta.handle.toLowerCase())) {
+        if (meta.handle && (meta.handle.toLowerCase().includes(handle) || handle.includes(meta.handle.toLowerCase()))) {
           console.log(`Detected project by partial handle: ${key}`, meta)
           return meta
         }
@@ -215,6 +199,11 @@ export function getProjectMeta(tweetText: string): ProjectMeta {
     return PROJECT_MAPPING['humanity protocol']
   }
   
+  if (tweetText.includes('xeet.ai')) {
+    console.log('Detected Xeet by URL')
+    return PROJECT_MAPPING['xeetdotai']
+  }
+  
   // Check for app store links
   if (tweetText.includes('com.humanityapp') || tweetText.includes('humanity-protocol-app')) {
     console.log('Detected Humanity Protocol by app link')
@@ -235,8 +224,8 @@ export function getProjectMeta(tweetText: string): ProjectMeta {
   if (hasCryptoKeywords) {
     console.log('Detected generic crypto content')
     return {
-      handle: 'crypto',
-      ticker: 'CRYPTO',
+      handle: null,
+      ticker: null,
       hashtags: ['#crypto', '#web3', '#blockchain']
     }
   }
@@ -244,8 +233,8 @@ export function getProjectMeta(tweetText: string): ProjectMeta {
   // Ultimate fallback for non-crypto content
   console.log('No specific project detected, using generic fallback')
   return {
-    handle: 'twitter',
-    ticker: 'TWEET',
-    hashtags: ['#twitter', '#social', '#discussion']
+    handle: null,
+    ticker: null,
+    hashtags: ['#discussion', '#social', '#thoughts']
   }
 }

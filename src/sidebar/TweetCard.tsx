@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Tone } from './SidebarApp'
 
 interface Tweet {
@@ -20,6 +20,8 @@ interface TweetCardProps {
   onCopyToClipboard: (text: string) => Promise<boolean>
   onFillReplyBox: (tweet: Tweet, text: string) => Promise<boolean>
   apiKeyConfigured: boolean
+  cryptoMode: boolean
+  theme: 'light' | 'dark'
 }
 
 const tones: { value: Tone; label: string; emoji: string }[] = [
@@ -35,7 +37,9 @@ function TweetCard({
   onRewriteReply, 
   onCopyToClipboard, 
   onFillReplyBox,
-  apiKeyConfigured 
+  apiKeyConfigured,
+  cryptoMode,
+  theme
 }: TweetCardProps) {
   const [selectedTone, setSelectedTone] = useState<Tone>('Smart')
   const [generatedReply, setGeneratedReply] = useState<string | null>(null)
@@ -43,6 +47,8 @@ function TweetCard({
   const [isRewriting, setIsRewriting] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
   const [fillSuccess, setFillSuccess] = useState(false)
+  const [displayedReply, setDisplayedReply] = useState('')
+  const [isTyping, setIsTyping] = useState(false)
 
   const formatTimestamp = (timestamp: string) => {
     try {
@@ -69,10 +75,34 @@ function TweetCard({
     return count.toString()
   }
 
+  // Typewriter effect for generated replies
+  useEffect(() => {
+    if (generatedReply && generatedReply !== displayedReply) {
+      setIsTyping(true)
+      setDisplayedReply('')
+      
+      let index = 0
+      const timer = setInterval(() => {
+        if (index < generatedReply.length) {
+          setDisplayedReply(generatedReply.slice(0, index + 1))
+          index++
+        } else {
+          setIsTyping(false)
+          clearInterval(timer)
+        }
+      }, 30) // Adjust speed here
+
+      return () => clearInterval(timer)
+    }
+  }, [generatedReply])
+
   const handleGenerateReply = async () => {
     if (!apiKeyConfigured) return
 
     setIsGenerating(true)
+    setGeneratedReply(null)
+    setDisplayedReply('')
+    
     try {
       const reply = await onGenerateReply(tweet, selectedTone)
       setGeneratedReply(reply)
@@ -118,51 +148,75 @@ function TweetCard({
     }
   }
 
+  const cardBg = theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+  const textPrimary = theme === 'dark' ? 'text-gray-100' : 'text-gray-900'
+  const textSecondary = theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+  const textMuted = theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+    <div className={`${cardBg} rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 p-4 transform hover:scale-[1.02]`}>
       {/* Tweet Header */}
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-            <span className="text-xs font-bold text-gray-600">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center shadow-lg">
+            <span className="text-sm font-bold text-white">
               {tweet.author.charAt(0).toUpperCase()}
             </span>
           </div>
           <div>
-            <div className="font-semibold text-sm text-gray-900">{tweet.author}</div>
-            <div className="text-xs text-gray-500">@{tweet.username}</div>
+            <div className={`font-semibold text-sm ${textPrimary}`}>{tweet.author}</div>
+            <div className={`text-xs ${textMuted}`}>@{tweet.username}</div>
           </div>
         </div>
-        <div className="text-xs text-gray-500">{formatTimestamp(tweet.timestamp)}</div>
+        <div className={`text-xs ${textMuted} bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full`}>
+          {formatTimestamp(tweet.timestamp)}
+        </div>
       </div>
 
       {/* Tweet Content */}
-      <div className="mb-3">
-        <p className="text-sm text-gray-800 leading-relaxed">{tweet.text}</p>
+      <div className="mb-4">
+        <p className={`text-sm ${textSecondary} leading-relaxed`}>{tweet.text}</p>
       </div>
 
       {/* Tweet Metrics */}
-      <div className="flex items-center space-x-4 mb-4 text-xs text-gray-500">
-        <span>💬 {formatCount(tweet.replyCount)}</span>
-        <span>🔄 {formatCount(tweet.retweetCount)}</span>
-        <span>❤️ {formatCount(tweet.likeCount)}</span>
+      <div className={`flex items-center space-x-4 mb-4 text-xs ${textMuted}`}>
+        <span className="flex items-center space-x-1">
+          <span>💬</span>
+          <span>{formatCount(tweet.replyCount)}</span>
+        </span>
+        <span className="flex items-center space-x-1">
+          <span>🔄</span>
+          <span>{formatCount(tweet.retweetCount)}</span>
+        </span>
+        <span className="flex items-center space-x-1">
+          <span>❤️</span>
+          <span>{formatCount(tweet.likeCount)}</span>
+        </span>
+        {cryptoMode && (
+          <span className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-1 rounded-full text-xs font-medium">
+            ₿ Crypto Mode
+          </span>
+        )}
       </div>
 
       {/* Tone Selector */}
-      <div className="mb-3">
-        <div className="text-xs font-semibold text-gray-700 mb-2">Reply Tone:</div>
-        <div className="flex space-x-1">
+      <div className="mb-4">
+        <div className={`text-xs font-semibold ${textPrimary} mb-2`}>Reply Tone:</div>
+        <div className="grid grid-cols-2 gap-2">
           {tones.map((tone) => (
             <button
               key={tone.value}
               onClick={() => setSelectedTone(tone.value)}
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+              className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 transform hover:scale-105 ${
                 selectedTone === tone.value
-                  ? 'bg-twitter-blue text-white'
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                  : theme === 'dark'
+                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {tone.emoji} {tone.label}
+              <span className="mr-1">{tone.emoji}</span>
+              {tone.label}
             </button>
           ))}
         </div>
@@ -172,46 +226,120 @@ function TweetCard({
       <button
         onClick={handleGenerateReply}
         disabled={isGenerating || !apiKeyConfigured}
-        className="w-full bg-twitter-blue text-white py-2 px-3 rounded text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-3"
+        className={`w-full py-3 px-4 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none mb-4 ${
+          apiKeyConfigured
+            ? 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl'
+            : 'bg-gray-300 text-gray-500'
+        }`}
       >
         {isGenerating ? (
           <div className="flex items-center justify-center space-x-2">
-            <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
             <span>Generating...</span>
           </div>
         ) : (
-          '✨ Generate AI Reply'
+          <span className="flex items-center justify-center space-x-2">
+            <span>✨</span>
+            <span>Generate AI Reply</span>
+          </span>
         )}
       </button>
 
       {/* Generated Reply */}
-      {generatedReply && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-          <div className="text-xs font-semibold text-green-800 mb-2">Generated Reply:</div>
-          <p className="text-sm text-green-700 mb-3 leading-relaxed">{generatedReply}</p>
+      {(generatedReply || displayedReply) && (
+        <div className={`rounded-xl p-4 border-2 ${
+          theme === 'dark' 
+            ? 'bg-green-900 bg-opacity-20 border-green-500 border-opacity-30' 
+            : 'bg-green-50 border-green-200'
+        }`}>
+          <div className={`text-xs font-semibold mb-2 flex items-center space-x-2 ${
+            theme === 'dark' ? 'text-green-300' : 'text-green-800'
+          }`}>
+            <span>🤖</span>
+            <span>Generated Reply:</span>
+            {isTyping && (
+              <div className="flex space-x-1">
+                <div className="w-1 h-1 bg-green-500 rounded-full animate-bounce"></div>
+                <div className="w-1 h-1 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-1 h-1 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
+            )}
+          </div>
+          <p className={`text-sm mb-3 leading-relaxed ${
+            theme === 'dark' ? 'text-green-200' : 'text-green-700'
+          }`}>
+            {displayedReply}
+            {isTyping && <span className="animate-pulse">|</span>}
+          </p>
           
-          <div className="flex space-x-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={handleCopy}
-              className="flex-1 bg-green-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-green-700 transition-colors"
+              className={`py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 transform hover:scale-105 ${
+                copySuccess
+                  ? 'bg-green-600 text-white'
+                  : theme === 'dark'
+                  ? 'bg-green-700 hover:bg-green-600 text-green-100'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
             >
-              {copySuccess ? '✅ Copied!' : '📋 Copy'}
+              {copySuccess ? (
+                <span className="flex items-center justify-center space-x-1">
+                  <span>✅</span>
+                  <span>Copied!</span>
+                </span>
+              ) : (
+                <span className="flex items-center justify-center space-x-1">
+                  <span>📋</span>
+                  <span>Copy</span>
+                </span>
+              )}
             </button>
             
             <button
               onClick={handleRewriteReply}
               disabled={isRewriting || !apiKeyConfigured}
-              className="flex-1 bg-gray-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-gray-700 disabled:opacity-50 transition-colors"
+              className={`py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none ${
+                theme === 'dark'
+                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                  : 'bg-gray-600 hover:bg-gray-700 text-white'
+              }`}
             >
-              {isRewriting ? '⏳ Rewriting...' : '🔄 Rewrite'}
+              {isRewriting ? (
+                <span className="flex items-center justify-center space-x-1">
+                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
+                  <span>...</span>
+                </span>
+              ) : (
+                <span className="flex items-center justify-center space-x-1">
+                  <span>🔄</span>
+                  <span>Rewrite</span>
+                </span>
+              )}
             </button>
             
             {tweet.hasReplyBox && (
               <button
                 onClick={handleFillReplyBox}
-                className="flex-1 bg-blue-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+                className={`py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 transform hover:scale-105 ${
+                  fillSuccess
+                    ? 'bg-blue-600 text-white'
+                    : theme === 'dark'
+                    ? 'bg-blue-700 hover:bg-blue-600 text-blue-100'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
               >
-                {fillSuccess ? '✅ Filled!' : '📝 Fill Reply'}
+                {fillSuccess ? (
+                  <span className="flex items-center justify-center space-x-1">
+                    <span>✅</span>
+                    <span>Filled!</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center space-x-1">
+                    <span>📝</span>
+                    <span>Fill</span>
+                  </span>
+                )}
               </button>
             )}
           </div>
