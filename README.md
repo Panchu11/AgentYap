@@ -8,7 +8,7 @@
 
 > **Empowering Authentic Crypto Conversations with AI**
 
-YapMate is a revolutionary Chrome extension that transforms how users engage on crypto Twitter by providing AI-powered reply generation specifically optimized for cryptocurrency communities. Built with cutting-edge AI technology and deep understanding of crypto culture.
+YapMate is a revolutionary Chrome extension that transforms how users engage on crypto Twitter by providing AI-powered reply generation specifically optimized for cryptocurrency communities. Built with cutting-edge AI technology and deep understanding of crypto culture..
 
 ## 🌟 Features
 
